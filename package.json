@@ -1,0 +1,26 @@
+{
+    "name": "flag-party-backend",
+    "version": "1.0.0",
+    "description": "Backend multijoueur pour Flag Party",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "dev": "nodemon server.js"
+    },
+    "keywords": [
+        "flag",
+        "game",
+        "multiplayer",
+        "socketio"
+    ],
+    "author": "Votre nom",
+    "license": "MIT",
+    "dependencies": {
+        "cors": "^2.8.5",
+        "express": "^4.21.2",
+        "socket.io": "^4.8.1"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.1"
+    }
+}
