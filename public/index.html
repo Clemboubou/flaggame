@@ -1,2173 +1,258 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Flag Party</title>
-<script src="/socket.io/socket.io.js"></script>
-<style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-}
-
-.container {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    border-radius: 20px;
-    padding: 30px;
-    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    max-width: 900px;
-    width: 90%;
-    text-align: center;
-}
-
-h1 {
-    font-size: 3em;
-    margin-bottom: 30px;
-    background: linear-gradient(45deg, #FFD700, #FFA500);
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-}
-
-.screen {
-    display: none;
-}
-
-.screen.active {
-    display: block;
-}
-
-.btn {
-    background: linear-gradient(45deg, #4CAF50, #45a049);
-    color: white;
-    border: none;
-    padding: 15px 30px;
-    margin: 10px;
-    border-radius: 25px;
-    cursor: pointer;
-    font-size: 1.1em;
-    font-weight: bold;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-}
-
-.btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
-}
-
-.btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-}
-
-.btn-secondary {
-    background: linear-gradient(45deg, #2196F3, #1976D2);
-}
-
-.btn-danger {
-    background: linear-gradient(45deg, #f44336, #d32f2f);
-}
-
-input {
-    padding: 15px;
-    margin: 10px;
-    border: none;
-    border-radius: 10px;
-    font-size: 1.1em;
-    text-align: center;
-    background: rgba(255, 255, 255, 0.9);
-    color: #333;
-}
-
-/* Game Mode Selection Cards */
-.game-modes {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    margin: 30px 0;
-    flex-wrap: wrap;
-}
-
-.game-mode-card {
-    background: rgba(255, 255, 255, 0.15);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 15px;
-    padding: 20px;
-    width: 200px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
-}
-
-.game-mode-card:hover {
-    transform: translateY(-5px);
-    background: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-}
-
-.game-mode-card.selected {
-    border-color: #FFD700;
-    background: rgba(255, 215, 0, 0.2);
-    transform: translateY(-3px);
-}
-
-.game-mode-card h3 {
-    font-size: 1.3em;
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-}
-
-.game-mode-card .mode-icon {
-    font-size: 1.5em;
-    transition: color 0.3s ease;
-}
-
-.game-mode-card.selected .mode-icon {
-    color: #FFD700;
-}
-
-.game-mode-card p {
-    font-size: 0.9em;
-    opacity: 0.8;
-}
-
-/* Game Duration Selector */
-.game-duration-selector {
-    margin: 20px 0;
-}
-
-.duration-options {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-    margin-top: 10px;
-}
-
-.duration-btn {
-    padding: 10px 20px;
-    background: rgba(255, 255, 255, 0.2);
-    border: 2px solid transparent;
-    border-radius: 10px;
-    color: white;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.duration-btn.active {
-    border-color: #FFD700;
-    background: rgba(255, 215, 0, 0.2);
-}
-
-/* Waiting Room */
-.waiting-room {
-    text-align: center;
-}
-
-.room-code {
-    font-size: 2em;
-    font-weight: bold;
-    color: #FFD700;
-    background: rgba(0,0,0,0.3);
-    padding: 15px;
-    border-radius: 15px;
-    margin: 20px 0;
-}
-
-.players-list {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 15px;
-    padding: 20px;
-    margin: 20px 0;
-}
-
-.player {
-    display: flex;
-    justify-content: space-between;
-    padding: 10px;
-    margin: 5px 0;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    transition: all 0.3s ease;
-}
-
-.player-highlight {
-    animation: highlight 1s ease;
-}
-
-@keyframes highlight {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); background: rgba(255, 215, 0, 0.3); }
-}
-
-/* Flag and Game Elements */
-.flag-container {
-    margin: 20px 0;
-    position: relative;
-}
-
-.flag-img {
-    max-width: 300px;
-    width: 100%;
-    height: 200px;
-    object-fit: contain;
-    border-radius: 15px;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
-    background: white;
-    padding: 10px;
-    animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
-}
-
-.game-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin: 20px 0;
-    font-size: 1.2em;
-    font-weight: bold;
-}
-
-/* Circular Timer for LeFast */
-.circular-timer {
-    position: relative;
-    width: 80px;
-    height: 80px;
-}
-
-.circular-timer svg {
-    width: 80px;
-    height: 80px;
-    transform: rotate(-90deg);
-}
-
-.timer-circle {
-    fill: none;
-    stroke: rgba(255, 255, 255, 0.2);
-    stroke-width: 8;
-}
-
-.timer-progress {
-    fill: none;
-    stroke: #FFD700;
-    stroke-width: 8;
-    stroke-linecap: round;
-    transition: stroke-dashoffset 1s linear;
-}
-
-.timer-text {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 1.5em;
-    font-weight: bold;
-}
-
-/* Timer for other modes */
-.timer {
-    font-size: 2em;
-    font-weight: bold;
-    color: #FFD700;
-}
-
-.score-display {
-    font-size: 1.5em;
-    padding: 10px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    position: relative;
-}
-
-/* Speed Indicator */
-.speed-indicator {
-    font-size: 1.1em;
-    padding: 5px 15px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-}
-
-/* Mode Selection for LeDream */
-.mode-selection {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 15px;
-    padding: 20px;
-    margin: 20px 0;
-    text-align: center;
-}
-
-.mode-selection h3 {
-    margin-bottom: 15px;
-    color: #FFD700;
-}
-
-.mode-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    margin: 15px 0;
-}
-
-.mode-choice-btn {
-    padding: 15px 25px;
-    font-size: 1.1em;
-    min-width: 180px;
-}
-
-.mode-warning {
-    font-size: 0.9em;
-    color: #FFA500;
-    margin: 10px 0 0 0;
-    font-style: italic;
-}
-
-/* Answer Options for LeDream */
-.answer-options {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 15px;
-    margin: 20px 0;
-}
-
-.answer-btn {
-    padding: 15px;
-    background: rgba(255, 255, 255, 0.2);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 10px;
-    color: white;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-size: 1.1em;
-}
-
-.answer-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: scale(1.05);
-}
-
-/* Continent Bins for LeFist */
-.continent-bins {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 15px;
-    margin: 20px 0;
-}
-
-.continent-bin {
-    padding: 20px;
-    background: rgba(255, 255, 255, 0.15);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 15px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.continent-bin.drag-over {
-    background: rgba(255, 215, 0, 0.3);
-    border-color: #FFD700;
-}
-
-/* Between Questions (LeFast) */
-.between-questions {
-    background: rgba(255, 215, 0, 0.2);
-    border: 2px solid #FFD700;
-    border-radius: 15px;
-    padding: 20px;
-    margin: 20px 0;
-    font-size: 1.3em;
-    font-weight: bold;
-    color: #FFD700;
-}
-
-.winner-display {
-    font-size: 1.5em;
-    margin: 10px 0;
-}
-
-.countdown {
-    font-size: 2em;
-    color: #FFD700;
-    margin: 10px 0;
-}
-
-/* Score Bonus Animation */
-.score-bonus {
-    color: #4CAF50;
-    font-weight: bold;
-    animation: bonusFloat 1s ease forwards;
-}
-
-@keyframes bonusFloat {
-    0% { transform: translateY(0); opacity: 1; }
-    100% { transform: translateY(-20px); opacity: 0; }
-}
-
-/* Connection Status */
-.connection-status {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 10px 15px;
-    border-radius: 20px;
-    font-size: 0.9em;
-    font-weight: bold;
-    background: rgba(0,0,0,0.5);
-}
-
-.connection-status.connected {
-    background: rgba(76, 175, 80, 0.9);
-}
-
-/* Notification */
-.notification {
-    background: rgba(76, 175, 80, 0.9);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 10px;
-    margin: 10px 0;
-    display: none;
-    animation: slideIn 0.3s ease;
-}
-
-@keyframes slideIn {
-    from { transform: translateY(-20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-}
-
-.notification.error {
-    background: rgba(244, 67, 54, 0.9);
-}
-
-.notification.show {
-    display: block;
-}
-
-/* LeDream Specific Styles */
-#ledreamScreen {
-    background: linear-gradient(135deg, rgba(103, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-}
-
-/* Dashboard Styles */
-.ledream-dashboard {
-    background: rgba(0, 0, 0, 0.8);
-    border-radius: 15px;
-    padding: 20px;
-    margin: 20px 0;
-    backdrop-filter: blur(10px);
-}
-
-.dashboard-players {
-    display: flex;
-    justify-content: space-around;
-    gap: 20px;
-}
-
-.dashboard-player {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    padding: 15px;
-    text-align: center;
-    min-width: 150px;
-}
-
-.dashboard-player-name {
-    font-weight: bold;
-    font-size: 1.1em;
-    margin-bottom: 5px;
-}
-
-.dashboard-player-score {
-    font-size: 1.2em;
-    color: #FFD700;
-    margin-bottom: 5px;
-}
-
-.dashboard-player-result {
-    font-size: 2em;
-    margin-top: 5px;
-}
-
-.ledream-timer-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-}
-
-.ledream-timer-bar {
-    width: 200px;
-    height: 8px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.ledream-timer-progress {
-    height: 100%;
-    background: #4CAF50;
-    width: 100%;
-    transition: width 0.1s linear;
-    border-radius: 4px;
-}
-
-.ledream-timer-text {
-    font-size: 1.5em;
-    font-weight: bold;
-    color: #FFD700;
-}
-
-.ledream-answer-interface {
-    margin: 30px 0;
-}
-
-.ledream-input-section {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 20px;
-}
-
-.ledream-input-section input {
-    width: 300px;
-    padding: 15px;
-    font-size: 1.2em;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.9);
-    color: #333;
-    text-align: center;
-    transition: all 0.3s ease;
-}
-
-.ledream-input-section input:focus {
-    outline: none;
-    border-color: #FFD700;
-    box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
-}
-
-.ledream-points-indicator {
-    font-size: 1.1em;
-    font-weight: bold;
-    color: #4CAF50;
-    background: rgba(76, 175, 80, 0.1);
-    padding: 5px 15px;
-    border-radius: 20px;
-    border: 2px solid rgba(76, 175, 80, 0.3);
-}
-
-.ledream-help-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-}
-
-.ledream-help-btn {
-    background: linear-gradient(45deg, #2196F3, #1976D2);
-    padding: 15px 25px;
-    font-size: 1em;
-    line-height: 1.2;
-    min-width: 120px;
-    transition: all 0.3s ease;
-}
-
-.ledream-help-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
-}
-
-.ledream-help-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-}
-
-.help-points {
-    font-size: 0.8em;
-    opacity: 0.8;
-}
-
-.ledream-feedback {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 20px 30px;
-    border-radius: 15px;
-    font-size: 1.2em;
-    font-weight: bold;
-    z-index: 1000;
-    display: none;
-    text-align: center;
-}
-
-.ledream-feedback.correct {
-    background: rgba(76, 175, 80, 0.9);
-    border: 2px solid #4CAF50;
-}
-
-.ledream-feedback.incorrect {
-    background: rgba(244, 67, 54, 0.9);
-    border: 2px solid #f44336;
-}
-
-.ledream-feedback.show {
-    display: block;
-    animation: feedbackPulse 1.5s ease forwards;
-}
-
-@keyframes feedbackPulse {
-    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
-    20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
-    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
-}
-
-.speed-bonus-display {
-    color: #FFD700;
-    font-size: 0.9em;
-    margin-top: 5px;
-    animation: bonusGlow 1s ease;
-}
-
-@keyframes bonusGlow {
-    0%, 100% { opacity: 0.7; }
-    50% { opacity: 1; text-shadow: 0 0 10px #FFD700; }
-}
-
-/* Answer options for LeDream modes */
-.ledream-answer-options {
-    display: grid;
-    gap: 15px;
-    margin: 20px 0;
-}
-
-.ledream-answer-options.mode-carre {
-    grid-template-columns: 1fr 1fr;
-}
-
-.ledream-answer-options.mode-fifty {
-    grid-template-columns: 1fr 1fr;
-}
-
-.ledream-answer-btn {
-    padding: 15px;
-    background: rgba(255, 255, 255, 0.2);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 10px;
-    color: white;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-size: 1.1em;
-    font-weight: bold;
-}
-
-.ledream-answer-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-}
-
-.ledream-answer-btn.correct {
-    background: rgba(76, 175, 80, 0.8);
-    border-color: #4CAF50;
-}
-
-.ledream-answer-btn.incorrect {
-    background: rgba(244, 67, 54, 0.8);
-    border-color: #f44336;
-}
-
-/* LeFist Specific Styles - Mario 64 Inspired */
-#lefistScreen {
-    background: linear-gradient(135deg, #87CEEB 0%, #98FB98 100%);
-    transition: background 0.5s ease;
-    position: relative;
-    overflow: hidden;
-}
-
-#lefistScreen.speed-normal {
-    background: linear-gradient(135deg, #FFE4B5 0%, #FFDAB9 100%);
-}
-
-#lefistScreen.speed-fast {
-    background: linear-gradient(135deg, #FFA07A 0%, #FF7F50 100%);
-}
-
-#lefistScreen.speed-extreme {
-    background: linear-gradient(135deg, #FF6347 0%, #DC143C 100%);
-}
-
-.lefist-game-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px 30px;
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 15px;
-    margin: 10px;
-    backdrop-filter: blur(5px);
-}
-
-.lefist-timer, .lefist-score, .lefist-speed {
-    background: rgba(255, 255, 255, 0.9);
-    padding: 8px 15px;
-    border-radius: 20px;
-    font-weight: bold;
-    color: #333;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-.lefist-speed {
-    transition: all 0.3s ease;
-}
-
-.lefist-game-area {
-    position: relative;
-    height: 600px;
-    margin: 20px;
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    overflow: hidden;
-}
-
-/* Zone d'apparition centrale */
-.lefist-flag-spawn-zone {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 300px;
-    height: 300px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease;
-}
-
-.lefist-spawn-indicator {
-    display: none; /* Masquer l'indicateur */
-}
-
-.lefist-flag-item {
-    position: relative;
-    cursor: grab;
-    transition: all 0.3s ease;
-    animation: flagAppear 0.5s ease;
-}
-
-.lefist-flag-item:active {
-    cursor: grabbing;
-    transform: scale(1.1);
-}
-
-.lefist-flag-item img {
-    width: 180px;
-    height: 120px;
-    object-fit: contain;
-    border-radius: 15px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-    background: white;
-    padding: 8px;
-    cursor: grab;
-}
-
-.lefist-flag-item img:active {
-    cursor: grabbing;
-}
-
-.lefist-flag-timer {
-    position: absolute;
-    bottom: -35px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(255, 0, 0, 0.9);
-    color: white;
-    padding: 5px 12px;
-    border-radius: 15px;
-    font-size: 1em;
-    font-weight: bold;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-}
-
-@keyframes flagAppear {
-    0% { opacity: 0; transform: scale(0.5) rotate(-10deg); }
-    50% { transform: scale(1.1) rotate(5deg); }
-    100% { opacity: 1; transform: scale(1) rotate(0deg); }
-}
-
-@keyframes flagDisappear {
-    0% { opacity: 1; transform: scale(1); }
-    100% { opacity: 0; transform: scale(0.3) rotate(20deg); }
-}
-
-/* Boîtes de continents disposées autour */
-.lefist-continent-bins {
-    position: relative;
-    width: 100%;
-    height: 100%;
-}
-
-.lefist-continent-bin {
-    position: absolute;
-    width: 130px;
-    height: 100px;
-    background: rgba(255, 255, 255, 0.2);
-    border: 3px solid rgba(255, 255, 255, 0.4);
-    border-radius: 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    backdrop-filter: blur(5px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-}
-
-.lefist-continent-bin:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: scale(1.05);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-}
-
-.lefist-continent-bin.drag-over {
-    background: rgba(255, 215, 0, 0.4);
-    border-color: #FFD700;
-    transform: scale(1.1);
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
-}
-
-.lefist-bin-icon {
-    font-size: 1.8em;
-    margin-bottom: 5px;
-}
-
-.lefist-bin-label {
-    font-size: 0.8em;
-    font-weight: bold;
-    color: white;
-    text-align: center;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-}
-
-/* Positionnement des boîtes */
-.lefist-bin-top-left {
-    top: 30px;
-    left: 30px;
-}
-
-.lefist-bin-top-right {
-    top: 30px;
-    right: 30px;
-}
-
-.lefist-bin-middle-left {
-    top: 50%;
-    left: 30px;
-    transform: translateY(-50%);
-}
-
-.lefist-bin-middle-right {
-    top: 50%;
-    right: 30px;
-    transform: translateY(-50%);
-}
-
-.lefist-bin-bottom-left {
-    bottom: 30px;
-    left: 30px;
-}
-
-.lefist-bin-bottom-right {
-    bottom: 30px;
-    right: 30px;
-}
-
-/* Feedback visuel */
-.lefist-feedback {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 20px 30px;
-    border-radius: 15px;
-    font-size: 1.5em;
-    font-weight: bold;
-    z-index: 1000;
-    display: none;
-    text-align: center;
-}
-
-.lefist-feedback.correct {
-    background: rgba(76, 175, 80, 0.9);
-    border: 2px solid #4CAF50;
-}
-
-.lefist-feedback.incorrect {
-    background: rgba(244, 67, 54, 0.9);
-    border: 2px solid #f44336;
-}
-
-.lefist-feedback.show {
-    display: block;
-    animation: feedbackPulse 1s ease forwards;
-}
-
-/* Drag and Drop for LeFist */
-.lefist-flag-item {
-    cursor: grab;
-}
-
-.lefist-flag-item:active {
-    cursor: grabbing;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .game-modes {
-        flex-direction: column;
-        align-items: center;
-    }
-    
-    .continent-bins {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
-    .answer-options {
-        grid-template-columns: 1fr;
-    }
-    
-    .ledream-input-section input {
-        width: 250px;
-    }
-    
-    .ledream-help-buttons {
-        flex-direction: column;
-        align-items: center;
-    }
-}
-</style>
+<link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
 <div class="connection-status" id="connectionStatus">🔴 Déconnecté</div>
 
 <div class="container">
-<h1>🏁 Flag Party</h1>
+  <h1>🏁 Flag Party</h1>
 
-<div class="notification" id="notification"></div>
+  <div class="notification" id="notification"></div>
 
-<!-- Écran d'accueil -->
-<div id="homeScreen" class="screen active">
-    <input type="text" id="playerName" placeholder="Votre nom" maxlength="20">
-    <br>
+  <!-- Écran d'accueil -->
+  <div id="homeScreen" class="screen active">
+    <input type="text" id="playerName" placeholder="Votre nom" maxlength="20" />
+    <br />
     <button class="btn" onclick="createRoom()">Créer une partie</button>
     <button class="btn btn-secondary" onclick="showJoinRoom()">Rejoindre une partie</button>
-</div>
+  </div>
 
-<!-- Rejoindre une partie -->
-<div id="joinScreen" class="screen">
-    <input type="text" id="roomCode" placeholder="Code de la partie" maxlength="6">
-    <br>
+  <!-- Rejoindre une partie -->
+  <div id="joinScreen" class="screen">
+    <input type="text" id="roomCode" placeholder="Code de la partie" maxlength="6" />
+    <br />
     <button class="btn" onclick="joinRoom()">Rejoindre</button>
     <button class="btn btn-secondary" onclick="goHome()">Retour</button>
-</div>
+  </div>
 
-<!-- Salle d'attente -->
-<div id="waitingScreen" class="screen">
+  <!-- Salle d'attente -->
+  <div id="waitingScreen" class="screen">
     <div class="waiting-room">
-        <h2>Salle d'attente</h2>
-        <div class="room-code" id="roomCodeDisplay"></div>
-        
-        <div id="gameModeSelector">
-            <h3>Choisissez le mode de jeu:</h3>
-            <div class="game-modes">
-                <div class="game-mode-card" data-mode="lefast" onclick="selectGameMode('lefast')">
-                    <h3><span class="mode-icon">⚡</span> LeFast</h3>
-                    <p>Soyez le plus rapide à trouver le nom du pays!</p>
-                </div>
-                <div class="game-mode-card" data-mode="ledream" onclick="selectGameMode('ledream')">
-                    <h3><span class="mode-icon">🌟</span> LeDream</h3>
-                    <p>QCM avec bonus de rapidité</p>
-                </div>
-                <div class="game-mode-card" data-mode="lefist" onclick="selectGameMode('lefist')">
-                    <h3><span class="mode-icon">👊</span> LeFist</h3>
-                    <p>Glissez les drapeaux dans le bon continent!</p>
-                </div>
-            </div>
-        </div>
+      <h2>Salle d'attente</h2>
+      <div class="room-code" id="roomCodeDisplay"></div>
 
-        <div class="game-duration-selector" id="gameDurationSelector">
-            <label>Durée du jeu:</label>
-            <div class="duration-options">
-                <div class="duration-btn active" onclick="setGameDuration(30)">30s</div>
-                <div class="duration-btn" onclick="setGameDuration(60)">60s</div>
-                <div class="duration-btn" onclick="setGameDuration(90)">90s</div>
-            </div>
-            <div class="ledream-info" id="ledreamInfo" style="display: none;">
-                <p style="color: #FFD700; font-style: italic; margin-top: 10px;">
-                    ⚡ Mode LeDream : Partie en continu jusqu'à ce qu'un joueur atteigne 15000 points !
-                </p>
-            </div>
+      <div class="game-mode-selector" id="gameModeSelector">
+        <h3>Choisissez le mode de jeu:</h3>
+        <div class="game-modes">
+          <div class="game-mode-card" data-mode="lefast" onclick="selectGameMode('lefast')">
+            <h3><span class="mode-icon">⚡</span> LeFast</h3>
+            <p>3 tentatives par question, classement par rapidité !</p>
+          </div>
+          <div class="game-mode-card" data-mode="ledream" onclick="selectGameMode('ledream')">
+            <h3><span class="mode-icon">🌟</span> LeDream</h3>
+            <p>QCM avec bonus de rapidité</p>
+          </div>
+          <div class="game-mode-card" data-mode="lefist" onclick="selectGameMode('lefist')">
+            <h3><span class="mode-icon">👊</span> LeFist</h3>
+            <p>Cliquez sur le bon continent pour chaque drapeau !</p>
+          </div>
         </div>
+      </div>
 
-        <div class="players-list">
-            <h3>Joueurs connectés:</h3>
-            <div id="playersList"></div>
+      <div class="game-duration-selector" id="gameDurationSelector">
+        <label>Durée du jeu:</label>
+        <div class="duration-options">
+          <div class="duration-btn active" onclick="setGameDuration(30, this)">30s</div>
+          <div class="duration-btn" onclick="setGameDuration(60, this)">60s</div>
+          <div class="duration-btn" onclick="setGameDuration(90, this)">90s</div>
         </div>
-        
-        <button class="btn" id="startGameBtn" onclick="startGame()" style="display: none;">Commencer la partie</button>
-        <button class="btn btn-danger" onclick="leaveRoom()">Quitter</button>
+        <div class="ledream-info" id="ledreamInfo" style="display: none;">
+          <p style="color: #FFD700; font-style: italic; margin-top: 10px;">
+            ⚡ Mode LeDream : Partie en continu jusqu'à ce qu'un joueur atteigne 15000 points !
+          </p>
+        </div>
+        <div class="lefast-info" id="lefastInfo" style="display: none;">
+          <p style="color: #FFD700; font-style: italic; margin-top: 10px;">
+            🏆 Mode LeFast : Premier à 15000 points ! 3 tentatives par question, 15s par question.
+          </p>
+        </div>
+        <div class="lefist-info" id="lefistInfo" style="display: none;">
+          <p style="color: #FFD700; font-style: italic; margin-top: 10px;">
+            👊 Mode LeFist : Cliquez sur le bon continent ! 5 erreurs maximum, 30s ou 60s au choix.
+          </p>
+        </div>
+      </div>
+
+      <div class="players-list">
+        <h3>Joueurs connectés:</h3>
+        <div id="playersList"></div>
+      </div>
+
+      <button class="btn" id="startGameBtn" onclick="startGame()" style="display: none;">Commencer la partie</button>
+      <button class="btn btn-danger" onclick="leaveRoom()">Quitter</button>
     </div>
-</div>
+  </div>
 
-<!-- Jeu LeFast -->
-<div id="lefastScreen" class="screen">
+  <!-- Jeu LeFast - NOUVELLES RÈGLES -->
+  <div id="lefastScreen" class="screen">
     <div class="game-info">
-        <div class="circular-timer">
-            <svg>
-                <circle class="timer-circle" cx="40" cy="40" r="36"></circle>
-                <circle class="timer-progress" cx="40" cy="40" r="36" 
-                        stroke-dasharray="226" stroke-dashoffset="0" id="timerProgress"></circle>
-            </svg>
-            <div class="timer-text" id="lefastTimer">30</div>
-        </div>
-        <div class="score-display">Score: <span id="lefastScore">0</span></div>
+      <div class="lefast-attempts-info">
+        <div class="attempts-display" id="lefastAttemptsDisplay">Tentatives restantes: 3/3</div>
+        <div class="objective">Objectif: 15000 points</div>
+      </div>
+      <div class="lefast-timer-info">
+        <div class="question-timer normal" id="lefastQuestionTimer">15</div>
+        <div class="timer-label">secondes</div>
+      </div>
+      <div class="score-display">Score: <span id="lefastScore">0</span></div>
     </div>
 
     <div class="flag-container">
-        <img id="lefastFlagImage" class="flag-img" src="" alt="Drapeau">
+      <img id="lefastFlagImage" class="flag-img" src="" alt="Drapeau" />
     </div>
 
     <div id="lefastBetweenQuestions" class="between-questions" style="display: none;">
-        <div class="winner-display" id="lefastWinnerDisplay"></div>
+      <div class="results-display" id="lefastResultsDisplay"></div>
+      <div class="countdown-section">
         <div class="countdown" id="lefastQuestionCountdown"></div>
         <div>Prochaine question dans...</div>
+      </div>
     </div>
 
     <div id="lefastGameContent" class="game-content">
-        <input type="text" id="lefastTextInput" placeholder="Nom du pays..." autocomplete="off">
-        <br>
-        <button class="btn" onclick="submitLefastAnswer()">Valider</button>
+      <input type="text" id="lefastTextInput" placeholder="Nom du pays..." autocomplete="off" />
+      <br />
+      <button class="btn" onclick="submitLefastAnswer()">Valider</button>
+      
+      <!-- Historique des tentatives -->
+      <div class="lefast-attempts-history" id="lefastAttemptsHistory" style="display: none;"></div>
+      
+      <div class="lefast-help">
+        <p>💡 Vous avez 3 tentatives et 15 secondes par question</p>
+      </div>
     </div>
-</div>
+  </div>
 
-<!-- Jeu LeDream -->
-<div id="ledreamScreen" class="screen">
+  <!-- Jeu LeDream -->
+  <div id="ledreamScreen" class="screen">
     <div class="game-info">
-        <div class="ledream-timer-container">
-            <div class="ledream-timer-bar">
-                <div class="ledream-timer-progress" id="ledreamTimerProgress"></div>
-            </div>
-            <div class="ledream-timer-text" id="ledreamTimer">10</div>
+      <div class="ledream-timer-container">
+        <div class="ledream-timer-bar">
+          <div class="ledream-timer-progress" id="ledreamTimerProgress"></div>
         </div>
-        <div class="score-display">Score: <span id="ledreamScore">0</span></div>
+        <div class="ledream-timer-text" id="ledreamTimer">10</div>
+      </div>
+      <div class="score-display">Score: <span id="ledreamScore">0</span></div>
     </div>
-    
-    <!-- Mini Dashboard -->
+
     <div class="ledream-dashboard" id="ledreamDashboard" style="display: none;">
-        <div class="dashboard-players" id="dashboardPlayers"></div>
+      <div class="dashboard-players" id="dashboardPlayers"></div>
     </div>
 
     <div class="flag-container">
-        <img id="ledreamFlagImage" class="flag-img" src="" alt="Drapeau">
+      <img id="ledreamFlagImage" class="flag-img" src="" alt="Drapeau" />
     </div>
 
-    <!-- Interface de réponse principale -->
     <div id="ledreamAnswerInterface" class="ledream-answer-interface">
-        <!-- Saisie complète (1000 pts) -->
-        <div class="ledream-input-section">
-            <input type="text" id="ledreamTextInput" placeholder="Tapez le nom du pays..." autocomplete="off">
-            <div class="ledream-points-indicator">1000 pts</div>
-        </div>
-        
-        <!-- Boutons d'aide -->
-        <div class="ledream-help-buttons">
-            <button class="btn ledream-help-btn" id="ledreamCarreBtn" onclick="activateLedreamMode('carre')">
-                📝 Carré<br><span class="help-points">500 pts</span>
-            </button>
-            <button class="btn ledream-help-btn" id="ledreamFiftyBtn" onclick="activateLedreamMode('fifty')">
-                ⚡ 50/50<br><span class="help-points">250 pts</span>
-            </button>
-        </div>
+      <div class="ledream-input-section">
+        <input type="text" id="ledreamTextInput" placeholder="Tapez le nom du pays..." autocomplete="off" />
+        <div class="ledream-points-indicator">1000 pts</div>
+      </div>
+
+      <div class="ledream-help-buttons">
+        <button class="btn ledream-help-btn" id="ledreamCarreBtn" onclick="activateLedreamMode('carre')">
+          📝 Carré<br /><span class="help-points">500 pts</span>
+        </button>
+        <button class="btn ledream-help-btn" id="ledreamFiftyBtn" onclick="activateLedreamMode('fifty')">
+          ⚡ 50/50<br /><span class="help-points">250 pts</span>
+        </button>
+      </div>
     </div>
 
-    <!-- Options de réponse (cachées par défaut) -->
     <div class="answer-options" id="ledreamAnswerOptions" style="display: none;"></div>
-    
-    <!-- Feedback de réponse -->
+
     <div id="ledreamFeedback" class="ledream-feedback"></div>
-</div>
+  </div>
 
-<!-- Jeu LeFist -->
-<div id="lefistScreen" class="screen">
-    <!-- Interface de jeu en haut -->
+  <!-- Jeu LeFist - NOUVEAU CONCEPT -->
+  <div id="lefistScreen" class="screen">
     <div class="lefist-game-header">
-        <div class="lefist-timer">Temps: <span id="lefistTimer">30</span>s</div>
-        <div class="lefist-score">Score: <span id="lefistScore">0</span></div>
-        <div class="lefist-speed" id="lefistSpeedIndicator">🐢 Facile</div>
+      <div class="lefist-timer">Temps: <span id="lefistTimer">30</span>s</div>
+      <div class="lefist-score">Score: <span id="lefistScore">0</span></div>
+      <div class="lefist-stats" id="lefistStatsDisplay">
+        <div class="lefist-stat correct">✅ 0</div>
+        <div class="lefist-stat incorrect">❌ 0/5</div>
+      </div>
     </div>
 
-    <!-- Zone de jeu principale -->
-    <div class="lefist-game-area">
-        <!-- Zone d'apparition des drapeaux (centre) -->
-        <div class="lefist-flag-spawn-zone">
-            <div id="lefistCurrentFlag" class="lefist-flag-item" style="display: none;">
-                <img id="lefistFlagImage" src="" alt="Drapeau" draggable="true">
-                <div class="lefist-flag-timer" id="lefistFlagTimer"></div>
-            </div>
-            <div class="lefist-spawn-indicator">Zone d'apparition</div>
-        </div>
+    <div class="lefist-game-content" id="lefistGameArea">
+      <div class="lefist-flag-display">
+        <img id="lefistFlagImage" src="" alt="Drapeau" class="lefist-flag-img" />
+      </div>
 
-        <!-- Boîtes de continents disposées autour -->
-        <div class="lefist-continent-bins">
-            <!-- Haut gauche -->
-            <div class="lefist-continent-bin lefist-bin-top-left" data-continent="Europe">
-                <div class="lefist-bin-icon">🇪🇺</div>
-                <div class="lefist-bin-label">Europe</div>
-            </div>
-            
-            <!-- Haut droite -->
-            <div class="lefist-continent-bin lefist-bin-top-right" data-continent="Asie">
-                <div class="lefist-bin-icon">🌏</div>
-                <div class="lefist-bin-label">Asie</div>
-            </div>
-            
-            <!-- Milieu gauche -->
-            <div class="lefist-continent-bin lefist-bin-middle-left" data-continent="Amérique">
-                <div class="lefist-bin-icon">🌎</div>
-                <div class="lefist-bin-label">Amérique</div>
-            </div>
-            
-            <!-- Milieu droite -->
-            <div class="lefist-continent-bin lefist-bin-middle-right" data-continent="Afrique">
-                <div class="lefist-bin-icon">🌍</div>
-                <div class="lefist-bin-label">Afrique</div>
-            </div>
-            
-            <!-- Bas gauche -->
-            <div class="lefist-continent-bin lefist-bin-bottom-left" data-continent="Océanie">
-                <div class="lefist-bin-icon">🏔️</div>
-                <div class="lefist-bin-label">Océanie</div>
-            </div>
-            
-            <!-- Bas droite -->
-            <div class="lefist-continent-bin lefist-bin-bottom-right" data-continent="Autre">
-                <div class="lefist-bin-icon">🌐</div>
-                <div class="lefist-bin-label">Autre</div>
-            </div>
-        </div>
+      <div class="lefist-continent-buttons">
+        <button class="lefist-continent-btn" onclick="handleLefistContinentClick('Europe')">
+          <div class="continent-image europe-map"></div>
+          <span class="continent-name">Europe</span>
+        </button>
+        
+        <button class="lefist-continent-btn" onclick="handleLefistContinentClick('Asie')">
+          <div class="continent-image asia-map"></div>
+          <span class="continent-name">Asie</span>
+        </button>
+        
+        <button class="lefist-continent-btn" onclick="handleLefistContinentClick('Amérique')">
+          <div class="continent-image america-map"></div>
+          <span class="continent-name">Amérique</span>
+        </button>
+        
+        <button class="lefist-continent-btn" onclick="handleLefistContinentClick('Afrique')">
+          <div class="continent-image africa-map"></div>
+          <span class="continent-name">Afrique</span>
+        </button>
+        
+        <button class="lefist-continent-btn" onclick="handleLefistContinentClick('Océanie')">
+          <div class="continent-image oceania-map"></div>
+          <span class="continent-name">Océanie</span>
+        </button>
+        
+        <button class="lefist-continent-btn" onclick="handleLefistContinentClick('Autre')">
+          <div class="continent-image other-map"></div>
+          <span class="continent-name">Autre</span>
+        </button>
+      </div>
     </div>
 
-    <!-- Feedback visuel -->
+    <!-- Écran de fin pour le joueur -->
+    <div id="lefistFinishedScreen" class="lefist-finished-screen" style="display: none;">
+      <!-- Contenu généré dynamiquement -->
+    </div>
+
     <div id="lefistFeedback" class="lefist-feedback"></div>
-</div>
+  </div>
 
-<!-- Résultats -->
-<div id="resultsScreen" class="screen">
+  <!-- Dashboard universel pour tous les modes -->
+  <div id="dashboardScreen" class="screen">
+    <div class="dashboard-container">
+      <h2 id="dashboardTitle">🏆 Classement final</h2>
+      <div class="dashboard-ranking" id="dashboardRanking">
+        <!-- Classement généré dynamiquement -->
+      </div>
+      <div class="dashboard-actions">
+        <button class="btn btn-secondary" onclick="returnToLobby()">Retour au lobby</button>
+        <button class="btn btn-danger" onclick="quitGame()">Quitter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Résultats -->
+  <div id="resultsScreen" class="screen">
     <h2>🎉 Fin de partie !</h2>
     <div class="players-list">
-        <h3>Classement final:</h3>
-        <div id="finalRanking"></div>
+      <h3>Classement final:</h3>
+      <div id="finalRanking"></div>
     </div>
     <button class="btn" onclick="goHome()">Nouvelle partie</button>
+  </div>
 </div>
-</div>
 
-<script>
-// Connexion Socket.io
-const socket = io();
-
-// Variables globales
-let currentRoom = null;
-let currentPlayer = null;
-let isHost = false;
-let betweenQuestionsTimer = null;
-let currentGameMode = 'lefast';
-let questionStartTime = null;
-let ledreamModeSelected = false;
-let selectedLedreamMode = null;
-let gameState = {
-    score: 0,
-    currentFlag: null,
-    gameStarted: false,
-    timeLeft: 30,
-    gameDuration: 30,
-    betweenQuestions: false,
-    speed: 1
-};
-
-// Gestion de la connexion
-socket.on('connect', () => {
-    updateConnectionStatus(true);
-});
-
-socket.on('disconnect', () => {
-    updateConnectionStatus(false);
-});
-
-function updateConnectionStatus(connected) {
-    const status = document.getElementById('connectionStatus');
-    if (connected) {
-        status.textContent = '🟢 Connecté';
-        status.className = 'connection-status connected';
-    } else {
-        status.textContent = '🔴 Déconnecté';
-        status.className = 'connection-status disconnected';
-    }
-}
-
-function showNotification(message, isError = false) {
-    const notification = document.getElementById('notification');
-    notification.textContent = message;
-    notification.className = 'notification show';
-    
-    if (isError) {
-        notification.classList.add('error');
-    }
-    
-    setTimeout(() => {
-        notification.classList.remove('show');
-        setTimeout(() => {
-            notification.classList.remove('error');
-        }, 300);
-    }, 3000);
-}
-
-// Fonctions d'écran
-function showScreen(screenId) {
-    document.querySelectorAll('.screen').forEach(screen => {
-        screen.classList.remove('active');
-    });
-    document.getElementById(screenId).classList.add('active');
-}
-
-function goHome() {
-    if (currentRoom) {
-        socket.emit('leave-room');
-    }
-    if (betweenQuestionsTimer) {
-        clearInterval(betweenQuestionsTimer);
-        betweenQuestionsTimer = null;
-    }
-    currentRoom = null;
-    currentPlayer = null;
-    isHost = false;
-    currentGameMode = 'lefast';
-    gameState = { score: 0, currentFlag: null, gameStarted: false, timeLeft: 30, gameDuration: 30, betweenQuestions: false, speed: 1 };
-    showScreen('homeScreen');
-}
-
-function showJoinRoom() {
-    showScreen('joinScreen');
-}
-
-// LeDream mode activation (pendant le jeu)
-function activateLedreamMode(mode) {
-    if (currentGameMode !== 'ledream' || !gameState.gameStarted) return;
-    
-    // Désactiver les boutons d'aide
-    document.getElementById('ledreamCarreBtn').disabled = true;
-    document.getElementById('ledreamFiftyBtn').disabled = true;
-    
-    // Masquer l'interface de saisie
-    document.getElementById('ledreamAnswerInterface').style.display = 'none';
-    
-    // Générer et afficher les options
-    generateLedreamOptions(gameState.currentFlag.name, mode);
-    
-    // Marquer le mode comme sélectionné pour cette question
-    selectedLedreamMode = mode;
-}
-
-// Fonctions de salle
-function createRoom() {
-    const playerName = document.getElementById('playerName').value.trim();
-    if (!playerName) {
-        showNotification('Veuillez entrer votre nom', true);
-        return;
-    }
-
-    currentPlayer = playerName;
-    socket.emit('create-room', { 
-        playerName: playerName, 
-        gameDuration: gameState.gameDuration 
-    });
-}
-
-// Fonction pour mettre à jour l'UI selon le mode de jeu
-function updateGameModeUI(mode) {
-    const durationOptions = document.querySelector('.duration-options');
-    const ledreamInfo = document.getElementById('ledreamInfo');
-    
-    if (mode === 'ledream') {
-        // Masquer les options de durée pour LeDream
-        durationOptions.style.display = 'none';
-        ledreamInfo.style.display = 'block';
-    } else {
-        // Afficher les options de durée pour LeFast et LeFist
-        durationOptions.style.display = 'flex';
-        ledreamInfo.style.display = 'none';
-    }
-}
-
-// Fonction pour sélectionner un mode de jeu
-function selectGameMode(mode) {
-    if (!isHost) return;
-    
-    currentGameMode = mode;
-    
-    // Mettre à jour l'affichage des cartes
-    document.querySelectorAll('.game-mode-card').forEach(card => {
-        card.classList.remove('selected');
-    });
-    document.querySelector(`[data-mode="${mode}"]`).classList.add('selected');
-    
-    // Mettre à jour l'UI selon le mode
-    updateGameModeUI(mode);
-    
-    // Envoyer le changement au serveur
-    socket.emit('set-game-mode', { mode: mode });
-}
-
-// Fonction pour définir la durée du jeu (seulement pour LeFast et LeFist)
-function setGameDuration(duration) {
-    if (!isHost || currentGameMode === 'ledream') return;
-    
-    gameState.gameDuration = duration;
-    
-    document.querySelectorAll('.duration-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    event.target.classList.add('active');
-    
-    socket.emit('set-game-duration', { duration: duration });
-}
-
-function joinRoom() {
-    const playerName = document.getElementById('playerName').value.trim();
-    const roomCode = document.getElementById('roomCode').value.trim().toUpperCase();
-    
-    if (!playerName || !roomCode) {
-        showNotification('Veuillez remplir tous les champs', true);
-        return;
-    }
-
-    currentPlayer = playerName;
-    socket.emit('join-room', { 
-        roomCode: roomCode, 
-        playerName: playerName 
-    });
-}
-
-// Fonction pour démarrer le jeu
-function startGame() {
-    if (!isHost) return;
-    
-    socket.emit('start-game');
-}
-
-function leaveRoom() {
-    socket.emit('leave-room');
-    goHome();
-}
-
-function selectGameMode(mode) {
-    if (!isHost) return;
-    
-    currentGameMode = mode;
-    
-    // Mettre à jour l'interface
-    document.querySelectorAll('.game-mode-card').forEach(card => {
-        card.classList.remove('selected');
-    });
-    document.querySelector(`[data-mode="${mode}"]`).classList.add('selected');
-    
-    // Informer le serveur
-    socket.emit('set-game-mode', { mode: mode });
-}
-
-function setGameDuration(duration) {
-    if (!isHost) return;
-    
-    gameState.gameDuration = duration;
-    socket.emit('set-game-duration', { duration: duration });
-    
-    document.querySelectorAll('.duration-btn').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
-}
-
-function updatePlayersList(players) {
-    const playersList = document.getElementById('playersList');
-    playersList.innerHTML = players.map(player => `
-        <div class="player">
-            <span>${player.name} ${player.isHost ? '👑' : ''}</span>
-            <span>${player.score} pts</span>
-        </div>
-    `).join('');
-}
-
-// Fonctions de jeu
-function startGame() {
-    if (!isHost) return;
-    socket.emit('start-game');
-}
-
-function displayNewFlag(flag) {
-    gameState.currentFlag = flag;
-    questionStartTime = Date.now();
-    
-    if (currentGameMode === 'lefast') {
-        document.getElementById('lefastFlagImage').src = `https://flagpedia.net/data/flags/w580/${flag.code}.png`;
-        document.getElementById('lefastBetweenQuestions').style.display = 'none';
-        document.getElementById('lefastGameContent').style.display = 'block';
-        document.getElementById('lefastTextInput').value = '';
-        document.getElementById('lefastTextInput').focus();
-    } else if (currentGameMode === 'ledream') {
-        document.getElementById('ledreamFlagImage').src = `https://flagpedia.net/data/flags/w580/${flag.code}.png`;
-        resetLedreamQuestion();
-        startLedreamTimer();
-    } else if (currentGameMode === 'lefist') {
-        showLefistFlag(flag);
-    }
-}
-
-function updateScore(score, mode) {
-    gameState.score = score;
-    if (mode === 'lefast') {
-        document.getElementById('lefastScore').textContent = score;
-    } else if (mode === 'ledream') {
-        document.getElementById('ledreamScore').textContent = score;
-    } else if (mode === 'lefist') {
-        document.getElementById('lefistScore').textContent = score;
-    }
-}
-
-// LeFast specific functions
-function submitLefastAnswer() {
-    const userAnswer = document.getElementById('lefastTextInput').value.trim();
-    if (!userAnswer || gameState.betweenQuestions) return;
-    
-    socket.emit('submit-answer', { 
-        answer: userAnswer, 
-        mode: 'lefast'
-    });
-    
-    document.getElementById('lefastTextInput').value = '';
-}
-
-function updateCircularTimer(timeLeft, totalTime) {
-    const circle = document.getElementById('timerProgress');
-    const circumference = 2 * Math.PI * 36;
-    const offset = circumference - (timeLeft / totalTime) * circumference;
-    circle.style.strokeDashoffset = offset;
-    document.getElementById('lefastTimer').textContent = timeLeft;
-}
-
-function showBetweenQuestions(winnerName, correctAnswer, points) {
-    gameState.betweenQuestions = true;
-    
-    document.getElementById('lefastBetweenQuestions').style.display = 'block';
-    document.getElementById('lefastGameContent').style.display = 'none';
-    
-    document.getElementById('lefastWinnerDisplay').innerHTML = 
-        `🏆 <strong>${winnerName}</strong> a trouvé "<strong>${correctAnswer}</strong>" en premier ! (+${points} pts)`;
-    
-    let countdown = 6;
-    document.getElementById('lefastQuestionCountdown').textContent = countdown;
-    
-    if (betweenQuestionsTimer) {
-        clearInterval(betweenQuestionsTimer);
-    }
-    
-    betweenQuestionsTimer = setInterval(() => {
-        countdown--;
-        document.getElementById('lefastQuestionCountdown').textContent = countdown;
-        
-        if (countdown <= 0) {
-            clearInterval(betweenQuestionsTimer);
-            betweenQuestionsTimer = null;
-            gameState.betweenQuestions = false;
-        }
-    }, 1000);
-}
-
-// LeDream specific functions
-let ledreamQuestionTimer = null;
-let ledreamTimeLeft = 10;
-
-function resetLedreamQuestion() {
-    // Arrêter le timer précédent s'il existe
-    if (ledreamQuestionTimer) {
-        clearInterval(ledreamQuestionTimer);
-        ledreamQuestionTimer = null;
-    }
-    
-    // Réinitialiser l'état de la question
-    selectedLedreamMode = null;
-    ledreamTimeLeft = 10;
-    
-    // Réactiver les boutons d'aide
-    document.getElementById('ledreamCarreBtn').disabled = false;
-    document.getElementById('ledreamFiftyBtn').disabled = false;
-    
-    // Afficher l'interface de saisie
-    document.getElementById('ledreamAnswerInterface').style.display = 'block';
-    
-    // Masquer les options de réponse
-    document.getElementById('ledreamAnswerOptions').style.display = 'none';
-    
-    // Vider le champ de saisie et le réactiver
-    const textInput = document.getElementById('ledreamTextInput');
-    textInput.value = '';
-    textInput.disabled = false;
-    textInput.focus();
-    
-    // Masquer le feedback
-    document.getElementById('ledreamFeedback').classList.remove('show');
-    
-    // Masquer le dashboard
-    document.getElementById('ledreamDashboard').style.display = 'none';
-    
-    // Réinitialiser la barre de progression
-    const timerProgress = document.getElementById('ledreamTimerProgress');
-    if (timerProgress) {
-        timerProgress.style.width = '100%';
-        timerProgress.style.background = '#4CAF50';
-    }
-}
-
-// Nouvelle fonction pour désactiver l'input après soumission
-function disableLedreamInput() {
-    const textInput = document.getElementById('ledreamTextInput');
-    textInput.disabled = true;
-    
-    // Désactiver aussi les boutons d'aide
-    document.getElementById('ledreamCarreBtn').disabled = true;
-    document.getElementById('ledreamFiftyBtn').disabled = true;
-}
-
-// Fonction pour afficher les résultats de la question
-function showLedreamQuestionResults(correctAnswer, playerResults) {
-    // Arrêter le timer local s'il tourne encore
-    if (ledreamQuestionTimer) {
-        clearInterval(ledreamQuestionTimer);
-        ledreamQuestionTimer = null;
-    }
-    
-    // Créer et afficher le dashboard avec les résultats
-    const dashboard = document.getElementById('ledreamDashboard');
-    const playersContainer = document.getElementById('dashboardPlayers');
-    
-    // Vider le contenu précédent
-    playersContainer.innerHTML = '';
-    
-    // Ajouter chaque joueur au dashboard
-    playerResults.forEach(player => {
-        const playerDiv = document.createElement('div');
-        playerDiv.className = 'dashboard-player';
-        
-        const emoji = player.isCorrect ? '✅' : '❌';
-        const pointsText = player.points > 0 ? `+${player.points}` : '0';
-        
-        playerDiv.innerHTML = `
-            <div class="dashboard-player-name">${player.playerName}</div>
-            <div class="dashboard-player-score">${player.newScore} pts</div>
-            <div class="dashboard-player-result">${emoji}</div>
-            ${player.points > 0 ? `<div style="color: #4CAF50; font-size: 0.9em;">${pointsText} pts</div>` : ''}
-        `;
-        
-        playersContainer.appendChild(playerDiv);
-    });
-    
-    // Afficher le dashboard
-    dashboard.style.display = 'block';
-    
-    // Afficher la bonne réponse
-    showLedreamFeedback(`⏰ Temps écoulé!<br>La réponse était: <strong>${correctAnswer}</strong>`, false, null, 0, 0);
-    
-    // Masquer le dashboard après 3 secondes
-    setTimeout(() => {
-        dashboard.style.display = 'none';
-    }, 3000);
-}
-
-function startLedreamTimer() {
-    if (ledreamQuestionTimer) {
-        clearInterval(ledreamQuestionTimer);
-    }
-    
-    ledreamTimeLeft = 10;
-    updateLedreamTimerDisplay();
-    
-    ledreamQuestionTimer = setInterval(() => {
-        ledreamTimeLeft--;
-        updateLedreamTimerDisplay();
-        
-        if (ledreamTimeLeft <= 0) {
-            clearInterval(ledreamQuestionTimer);
-            handleLedreamTimeout();
-        }
-    }, 1000);
-}
-
-function updateLedreamTimerDisplay() {
-    const timerText = document.getElementById('ledreamTimer');
-    const timerProgress = document.getElementById('ledreamTimerProgress');
-    
-    timerText.textContent = ledreamTimeLeft;
-    
-    // Mettre à jour la barre de progression (elle se vide avec le temps)
-    const percentage = (ledreamTimeLeft / 10) * 100;
-    timerProgress.style.width = percentage + '%';
-    
-    // Changer la couleur selon le temps restant
-    if (ledreamTimeLeft <= 3) {
-        timerProgress.style.background = '#FF5722';
-    } else if (ledreamTimeLeft <= 6) {
-        timerProgress.style.background = '#FFD700';
-    } else {
-        timerProgress.style.background = '#4CAF50';
-    }
-}
-
-function handleLedreamTimeout() {
-    // Le timeout est maintenant géré côté serveur
-    // Cette fonction n'est plus utilisée car le serveur gère le timer de 10 secondes
-}
-
-function submitLedreamTextAnswer() {
-    const textInput = document.getElementById('ledreamTextInput');
-    const answer = textInput.value.trim();
-    
-    if (!answer) return;
-    
-    const responseTime = Date.now() - questionStartTime;
-    
-    socket.emit('submit-answer', {
-        answer: answer,
-        mode: 'ledream',
-        responseType: 'text', // 1000 points
-        responseTime: responseTime
-    });
-}
-
-function generateLedreamOptions(correctAnswer, mode) {
-    const allCountries = [
-        'France', 'Allemagne', 'Italie', 'Espagne', 'Royaume-Uni', 
-        'États-Unis', 'Canada', 'Japon', 'Chine', 'Inde', 
-        'Brésil', 'Mexique', 'Australie', 'Afrique du Sud', 
-        'Égypte', 'Maroc', 'Suède', 'Norvège', 'Pays-Bas', 'Belgique',
-        'Suisse', 'Autriche', 'Portugal', 'Grèce', 'Turquie',
-        'Russie', 'Ukraine', 'Pologne', 'République tchèque', 'Hongrie'
-    ];
-    
-    const wrongAnswers = allCountries.filter(country => country !== correctAnswer);
-    const numWrongAnswers = mode === 'fifty' ? 1 : 3;
-    const shuffledWrong = wrongAnswers.sort(() => 0.5 - Math.random()).slice(0, numWrongAnswers);
-    
-    const options = [correctAnswer, ...shuffledWrong];
-    const shuffledOptions = options.sort(() => 0.5 - Math.random());
-    
-    const optionsContainer = document.getElementById('ledreamAnswerOptions');
-    optionsContainer.className = `answer-options ledream-answer-options mode-${mode}`;
-    
-    optionsContainer.innerHTML = shuffledOptions.map(option => `
-        <div class="ledream-answer-btn" onclick="submitLedreamAnswer('${option}', '${mode}')">${option}</div>
-    `).join('');
-    
-    // Afficher les options
-    optionsContainer.style.display = 'grid';
-}
-
-function submitLedreamAnswer(answer, mode) {
-    const responseTime = Date.now() - questionStartTime;
-    
-    socket.emit('submit-answer', {
-        answer: answer,
-        mode: 'ledream',
-        responseType: mode, // 'carre' (500 pts) ou 'fifty' (250 pts)
-        responseTime: responseTime
-    });
-}
-
-function showLedreamFeedback(message, isCorrect, correctAnswer = null, points = 0, speedBonus = 0) {
-    const feedback = document.getElementById('ledreamFeedback');
-    
-    let feedbackText = message;
-    if (isCorrect && points > 0) {
-        feedbackText += `<br>+${points} points`;
-        if (speedBonus > 0) {
-            feedbackText += `<br><span class="speed-bonus-display">Bonus rapidité: +${speedBonus}</span>`;
-        }
-    } else if (!isCorrect && correctAnswer) {
-        feedbackText += `<br>Réponse: ${correctAnswer}`;
-    }
-    
-    feedback.innerHTML = feedbackText;
-    feedback.className = `ledream-feedback ${isCorrect ? 'correct' : 'incorrect'} show`;
-    
-    setTimeout(() => {
-        feedback.classList.remove('show');
-    }, 1500);
-}
-
-function showSpeedBonus(points, element) {
-    if (!element) return;
-    
-    const bonus = document.createElement('div');
-    bonus.className = 'score-bonus';
-    bonus.textContent = `+${points}`;
-    bonus.style.position = 'absolute';
-    bonus.style.right = '10px';
-    bonus.style.top = '50%';
-    element.style.position = 'relative';
-    element.appendChild(bonus);
-    
-    setTimeout(() => {
-        if (bonus.parentNode) {
-            bonus.remove();
-        }
-    }, 1000);
-}
-
-// LeFist specific functions
-let lefistCurrentFlagTimer = null;
-let lefistFlagTimeLeft = 0;
-let lefistSpeed = 1;
-let lefistFlagTimeoutDuration = 5000; // 5 secondes par défaut
-
-function setupLefistDragAndDrop() {
-    const flagItem = document.getElementById('lefistCurrentFlag');
-    const flagImage = document.getElementById('lefistFlagImage');
-    const bins = document.querySelectorAll('.lefist-continent-bin');
-    
-    // Configuration du drag
-    flagImage.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', '');
-        flagItem.style.opacity = '0.7';
-    });
-    
-    flagImage.addEventListener('dragend', (e) => {
-        flagItem.style.opacity = '1';
-    });
-    
-    // Configuration des boîtes de dépôt
-    bins.forEach(bin => {
-        bin.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            bin.classList.add('drag-over');
-        });
-        
-        bin.addEventListener('dragleave', () => {
-            bin.classList.remove('drag-over');
-        });
-        
-        bin.addEventListener('drop', (e) => {
-            e.preventDefault();
-            bin.classList.remove('drag-over');
-            
-            const continent = bin.dataset.continent;
-            handleLefistFlagDrop(continent);
-        });
-    });
-}
-
-function showLefistFlag(flag) {
-    const flagItem = document.getElementById('lefistCurrentFlag');
-    const flagImage = document.getElementById('lefistFlagImage');
-    
-    // Configurer le drapeau
-    flagImage.src = `https://flagpedia.net/data/flags/w580/${flag.code}.png`;
-    flagImage.alt = flag.name;
-    
-    // Afficher avec animation
-    flagItem.style.display = 'block';
-    flagItem.style.animation = 'flagAppear 0.5s ease';
-    
-    // Démarrer le timer du drapeau
-    startLefistFlagTimer();
-}
-
-function startLefistFlagTimer() {
-    // Calculer le temps selon la vitesse (plus c'est rapide, moins de temps)
-    lefistFlagTimeoutDuration = Math.max(2000, 5000 - (lefistSpeed - 1) * 800);
-    lefistFlagTimeLeft = Math.ceil(lefistFlagTimeoutDuration / 1000);
-    
-    const flagTimer = document.getElementById('lefistFlagTimer');
-    flagTimer.textContent = lefistFlagTimeLeft;
-    flagTimer.style.display = 'block';
-    
-    lefistCurrentFlagTimer = setInterval(() => {
-        lefistFlagTimeLeft--;
-        flagTimer.textContent = lefistFlagTimeLeft;
-        
-        if (lefistFlagTimeLeft <= 0) {
-            clearInterval(lefistCurrentFlagTimer);
-            handleLefistFlagTimeout();
-        }
-    }, 1000);
-}
-
-function handleLefistFlagTimeout() {
-    // Animation de disparition
-    const flagItem = document.getElementById('lefistCurrentFlag');
-    flagItem.style.animation = 'flagDisappear 0.5s ease';
-    
-    setTimeout(() => {
-        hideLefistFlag();
-        showLefistFeedback('⏰ Temps écoulé!', false);
-        
-        // Le serveur générera automatiquement un nouveau drapeau
-        // (logique gérée côté serveur avec le timer global)
-    }, 500);
-}
-
-function handleLefistFlagDrop(continent) {
-    if (lefistCurrentFlagTimer) {
-        clearInterval(lefistCurrentFlagTimer);
-        lefistCurrentFlagTimer = null;
-    }
-    
-    // Envoyer la réponse au serveur
-    socket.emit('submit-answer', {
-        answer: continent,
-        mode: 'lefist',
-        responseTime: Date.now() - questionStartTime
-    });
-}
-
-function hideLefistFlag() {
-    const flagItem = document.getElementById('lefistCurrentFlag');
-    const flagTimer = document.getElementById('lefistFlagTimer');
-    
-    flagItem.style.display = 'none';
-    flagTimer.style.display = 'none';
-}
-
-function updateLefistSpeed(speed) {
-    lefistSpeed = speed;
-    const speedIndicator = document.getElementById('lefistSpeedIndicator');
-    const screen = document.getElementById('lefistScreen');
-    
-    // Supprimer les classes de vitesse précédentes
-    screen.classList.remove('speed-normal', 'speed-fast', 'speed-extreme');
-    
-    if (speed <= 1.5) {
-        speedIndicator.textContent = '🐢 Facile';
-        // Fond par défaut (bleu-vert)
-    } else if (speed <= 2.5) {
-        speedIndicator.textContent = '🚶 Normal';
-        screen.classList.add('speed-normal');
-    } else if (speed <= 3.5) {
-        speedIndicator.textContent = '🏃 Rapide';
-        screen.classList.add('speed-fast');
-    } else {
-        speedIndicator.textContent = '🚀 Extrême';
-        screen.classList.add('speed-extreme');
-    }
-}
-
-function showLefistFeedback(message, isCorrect, points = 0) {
-    const feedback = document.getElementById('lefistFeedback');
-    
-    let feedbackText = message;
-    if (isCorrect && points > 0) {
-        feedbackText += `<br>+${points} points`;
-    }
-    
-    feedback.innerHTML = feedbackText;
-    feedback.className = `lefist-feedback ${isCorrect ? 'correct' : 'incorrect'} show`;
-    
-    setTimeout(() => {
-        feedback.classList.remove('show');
-    }, 1000);
-}
-
-function requestNewLefistFlag() {
-    // Le serveur enverra automatiquement un nouveau drapeau
-    // Cette fonction peut être utilisée pour des actions spécifiques si nécessaire
-}
-
-// Socket.io Event Handlers
-socket.on('room-created', (data) => {
-    currentRoom = data.roomCode;
-    isHost = data.isHost;
-    
-    document.getElementById('roomCodeDisplay').textContent = data.roomCode;
-    document.getElementById('startGameBtn').style.display = 'block';
-    document.getElementById('gameModeSelector').style.display = 'block';
-    document.getElementById('gameDurationSelector').style.display = 'block';
-    
-    // Sélectionner le mode par défaut
-    document.querySelector('[data-mode="lefast"]').classList.add('selected');
-    updateGameModeUI('lefast'); // Mettre à jour l'UI selon le mode
-    
-    updatePlayersList(data.players);
-    showScreen('waitingScreen');
-    showNotification(`Room créée: ${data.roomCode}`);
-});
-
-socket.on('room-joined', (data) => {
-    currentRoom = data.roomCode;
-    isHost = data.isHost;
-    gameState.gameDuration = data.gameDuration;
-    
-    document.getElementById('roomCodeDisplay').textContent = data.roomCode;
-    document.getElementById('startGameBtn').style.display = 'none';
-    document.getElementById('gameModeSelector').style.display = 'none';
-    document.getElementById('gameDurationSelector').style.display = 'none';
-    
-    updatePlayersList(data.players);
-    showScreen('waitingScreen');
-    showNotification(`Vous avez rejoint la room: ${data.roomCode}`);
-});
-
-socket.on('join-error', (message) => {
-    showNotification(message, true);
-});
-
-socket.on('player-joined', (data) => {
-    updatePlayersList(data.players);
-    showNotification(`${data.newPlayer} a rejoint la partie`);
-});
-
-socket.on('player-left', (data) => {
-    updatePlayersList(data.players);
-    showNotification(`${data.playerName} a quitté la partie`);
-});
-
-socket.on('host-changed', (data) => {
-    updatePlayersList(data.players);
-    showNotification(`${data.newHostName} est maintenant l'hôte`);
-    
-    if (data.newHostName === currentPlayer) {
-        isHost = true;
-        document.getElementById('startGameBtn').style.display = 'block';
-        document.getElementById('gameModeSelector').style.display = 'block';
-        document.getElementById('gameDurationSelector').style.display = 'block';
-    }
-});
-
-socket.on('game-mode-changed', (mode) => {
-    currentGameMode = mode;
-    document.querySelectorAll('.game-mode-card').forEach(card => {
-        card.classList.remove('selected');
-    });
-    document.querySelector(`[data-mode="${mode}"]`).classList.add('selected');
-    updateGameModeUI(mode); // Mettre à jour l'UI selon le mode
-});
-
-socket.on('game-duration-changed', (duration) => {
-    gameState.gameDuration = duration;
-    document.querySelectorAll('.duration-btn').forEach(btn => {
-        btn.classList.remove('active');
-        if (btn.textContent === `${duration}s`) {
-            btn.classList.add('active');
-        }
-    });
-});
-
-socket.on('game-started', (data) => {
-    gameState.gameStarted = true;
-    gameState.timeLeft = data.timeLeft;
-    gameState.score = 0;
-    currentGameMode = data.gameMode;
-    
-    displayNewFlag(data.currentFlag);
-    updateScore(0, currentGameMode);
-    
-    // Afficher l'écran approprié selon le mode
-    if (currentGameMode === 'lefast') {
-        showScreen('lefastScreen');
-        updateCircularTimer(data.timeLeft, data.timeLeft);
-    } else if (currentGameMode === 'ledream') {
-        showScreen('ledreamScreen');
-        // Pas besoin d'afficher le timer global pour LeDream
-        // Le timer de 10 secondes par question suffit
-    } else if (currentGameMode === 'lefist') {
-        showScreen('lefistScreen');
-        document.getElementById('lefistTimer').textContent = data.timeLeft;
-        setupLefistDragAndDrop();
-        updateLefistSpeed(1);
-    }
-    
-    showNotification('Le jeu commence !');
-});
-
-socket.on('timer-update', (timeLeft) => {
-    gameState.timeLeft = timeLeft;
-    
-    if (currentGameMode === 'lefast') {
-        updateCircularTimer(timeLeft, gameState.gameDuration);
-    } else if (currentGameMode === 'ledream') {
-        // Ne pas mettre à jour le timer global pour LeDream
-        // On utilise uniquement le timer de 10 secondes par question
-    } else if (currentGameMode === 'lefist') {
-        document.getElementById('lefistTimer').textContent = timeLeft;
-    }
-});
-
-socket.on('question-won', (data) => {
-    if (currentGameMode === 'lefast') {
-        showBetweenQuestions(data.winnerName, data.correctAnswer, data.points);
-    }
-    
-    // Effet de mise en évidence du gagnant
-    if (data.winnerName === currentPlayer) {
-        const scoreDisplay = document.querySelector('.score-display');
-        if (scoreDisplay) {
-            scoreDisplay.classList.add('player-highlight');
-            setTimeout(() => {
-                scoreDisplay.classList.remove('player-highlight');
-            }, 1000);
-        }
-    }
-});
-
-socket.on('answer-result', (data) => {
-    if (currentGameMode === 'ledream') {
-        // Feedback spécifique pour LeDream - juste confirmer la soumission
-        const message = data.isCorrect ? '✅ Réponse soumise !' : '❌ Réponse soumise';
-        showLedreamFeedback(message, data.isCorrect, null, 0, 0);
-        
-        // Désactiver l'input après soumission pour empêcher le spam
-        disableLedreamInput();
-        
-        // Mettre à jour le score immédiatement si correct
-        if (data.isCorrect) {
-            updateScore(data.newScore, currentGameMode);
-        }
-    } else if (currentGameMode === 'lefist') {
-        // Feedback spécifique pour LeFist
-        const message = data.isCorrect ? '✅ Bien joué !' : '❌ Mauvais continent';
-        showLefistFeedback(message, data.isCorrect, data.points);
-        
-        // Masquer le drapeau actuel
-        hideLefistFlag();
-        
-        // Attendre un peu avant le prochain drapeau
-        setTimeout(() => {
-            // Le serveur enverra automatiquement un nouveau drapeau
-        }, 1000);
-    } else {
-        // Feedback pour les autres modes (LeFast)
-        if (data.isCorrect) {
-            showNotification(`✅ Correct ! +${data.points} points`);
-        } else {
-            showNotification(`❌ Mauvaise réponse. C'était: ${data.correctAnswer}`, true);
-        }
-    }
-    
-    if (currentGameMode !== 'ledream') {
-        updateScore(data.newScore, currentGameMode);
-    }
-});
-
-// Nouvel événement pour la fin de question LeDream
-socket.on('ledream-question-ended', (data) => {
-    if (currentGameMode === 'ledream') {
-        // Arrêter le timer local
-        if (ledreamQuestionTimer) {
-            clearInterval(ledreamQuestionTimer);
-            ledreamQuestionTimer = null;
-        }
-        
-        // Afficher les résultats finaux avec dashboard
-        showLedreamQuestionResults(data.correctAnswer, data.playerResults);
-    }
-});
-
-socket.on('new-flag', (data) => {
-    displayNewFlag(data.flag);
-    
-    // Mise à jour de la vitesse pour LeFist
-    if (currentGameMode === 'lefist' && data.speed) {
-        gameState.speed = data.speed;
-        updateLefistSpeed(data.speed);
-    }
-});
-
-socket.on('game-ended', (data) => {
-    const rankingElement = document.getElementById('finalRanking');
-    rankingElement.innerHTML = data.finalRanking.map((player, index) => `
-        <div class="player">
-            <span>${index + 1}. ${player.name} ${player.name === currentPlayer ? '(Vous)' : ''}</span>
-            <span>${player.score} pts</span>
-        </div>
-    `).join('');
-    
-    showScreen('resultsScreen');
-    showNotification('Fin de partie !');
-});
-
-// Événements clavier
-document.addEventListener('DOMContentLoaded', () => {
-    const lefastInput = document.getElementById('lefastTextInput');
-    if (lefastInput) {
-        lefastInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                submitLefastAnswer();
-            }
-        });
-    }
-
-    const playerNameInput = document.getElementById('playerName');
-    if (playerNameInput) {
-        playerNameInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                createRoom();
-            }
-        });
-        playerNameInput.focus();
-    }
-
-    const roomCodeInput = document.getElementById('roomCode');
-    if (roomCodeInput) {
-        roomCodeInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                joinRoom();
-            }
-        });
-    }
-
-    const ledreamInput = document.getElementById('ledreamTextInput');
-    if (ledreamInput) {
-        ledreamInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                submitLedreamTextAnswer();
-            }
-        });
-    }
-});
-</script>
+<!-- Scripts -->
+<script src="/socket.io/socket.io.js"></script>
+<script src="/client.js"></script>
 </body>
 </html>

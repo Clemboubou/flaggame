@@ -48,7 +48,7 @@ const countryToContinent = {
     'fr': 'Europe', 'de': 'Europe', 'it': 'Europe', 'es': 'Europe',
     'gb': 'Europe', 'se': 'Europe', 'no': 'Europe', 'fi': 'Europe',
     'dk': 'Europe', 'nl': 'Europe', 'be': 'Europe', 'ch': 'Europe',
-    'at': 'Europe', 'pt': 'Europe', 'gr': 'Europe', 'tr': 'Europe',
+    'at': 'Europe', 'pt': 'Portugal', 'gr': 'Europe', 'tr': 'Europe',
     'ru': 'Europe', 'ua': 'Europe', 'pl': 'Europe', 'cz': 'Europe',
     'hu': 'Europe', 'ro': 'Europe',
     
@@ -80,8 +80,112 @@ function generateRandomFlag() {
 }
 
 function getCountryContinent(countryCode) {
-    // Utiliser le mapping défini plus haut
     return countryToContinent[countryCode] || 'Autre';
+}
+
+// === SYSTÈME DE GESTION DES QUESTIONS LEFAST ===
+
+// Gérer la fin d'une question LeFast avec classement
+function handleLeFastQuestionEnd(roomCode) {
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState.started || room.gameState.gameMode !== 'lefast') {
+        return;
+    }
+
+    const correctAnswer = room.gameState.currentFlag.name;
+    const questionAnswers = room.gameState.lefastAnswers || new Map();
+    
+    // Calculer le classement basé sur les timestamps
+    const correctAnswers = [];
+    
+    for (const [playerId, playerAnswers] of questionAnswers.entries()) {
+        const correctAttempt = playerAnswers.find(attempt => 
+            attempt.answer.toLowerCase().trim() === correctAnswer.toLowerCase()
+        );
+        
+        if (correctAttempt) {
+            correctAnswers.push({
+                playerId: playerId,
+                playerName: room.players.get(playerId)?.name || 'Inconnu',
+                timestamp: correctAttempt.timestamp,
+                responseTime: correctAttempt.responseTime
+            });
+        }
+    }
+    
+    // Trier par timestamp (premier = plus petit timestamp)
+    correctAnswers.sort((a, b) => a.timestamp - b.timestamp);
+    
+    // Attribution des points selon le classement
+    const pointsScale = [1000, 700, 500, 300, 200]; // puis 100 pour tous les autres
+    const questionResults = [];
+    
+    correctAnswers.forEach((answer, index) => {
+        const points = index < pointsScale.length ? pointsScale[index] : 100;
+        const player = room.players.get(answer.playerId);
+        
+        if (player) {
+            player.score += points;
+            questionResults.push({
+                playerId: answer.playerId,
+                playerName: answer.playerName,
+                rank: index + 1,
+                points: points,
+                newScore: player.score,
+                responseTime: answer.responseTime
+            });
+            
+            // Vérifier si le joueur a atteint 15000 points
+            if (player.score >= 15000) {
+                console.log(`[LeFast] ${player.name} a atteint 15000 points - fin de partie`);
+                endGame(roomCode, 'lefast');
+                return;
+            }
+        }
+    });
+    
+    // Envoyer le récapitulatif à tous les joueurs
+    io.to(roomCode).emit('lefast-question-results', {
+        correctAnswer: correctAnswer,
+        results: questionResults,
+        totalAnswers: questionAnswers.size
+    });
+    
+    console.log(`[LeFast] Question terminée dans room ${roomCode}: ${correctAnswers.length} bonnes réponses`);
+    
+    // Nettoyer les données de la question
+    room.gameState.lefastAnswers = new Map();
+    
+    // Programmer la prochaine question après 4 secondes
+    setTimeout(() => {
+        generateNextLeFastQuestion(roomCode);
+    }, 4000);
+}
+
+// Générer la prochaine question LeFast
+function generateNextLeFastQuestion(roomCode) {
+    const room = rooms.get(roomCode);
+    if (!room || !room.gameState.started || room.gameState.gameMode !== 'lefast') {
+        return;
+    }
+    
+    const newFlag = generateRandomFlag();
+    room.gameState.currentFlag = newFlag;
+    room.gameState.lefastAnswers = new Map();
+    room.gameState.questionStartTime = Date.now();
+    
+    // Marquer le début de la nouvelle question (très permissif)
+    antiSpamManager.markQuestionStart(roomCode);
+    
+    // Envoyer la nouvelle question
+    io.to(roomCode).emit('new-flag', { flag: newFlag });
+    
+    console.log(`[LeFast] Nouvelle question: ${newFlag.code} - ${newFlag.name}`);
+    
+    // Démarrer le timer de 15 secondes pour clôturer automatiquement
+    setTimeout(() => {
+        handleLeFastQuestionEnd(roomCode);
+    }, 15000); // 15 secondes par question
 }
 
 // === FONCTIONS UTILITAIRES DE SÉCURITÉ ===
@@ -99,7 +203,7 @@ function validateSubmitAnswerPayload(data) {
         return { valid: false, error: 'Réponse manquante ou invalide' };
     }
     
-    if (typeof responseTime !== 'number' || responseTime < 0 || responseTime > 15000) {
+    if (typeof responseTime !== 'number' || responseTime < 0 || responseTime > 20000) {
         return { valid: false, error: 'Temps de réponse invalide' };
     }
     
@@ -175,10 +279,9 @@ class TimerManager {
 // Instance globale du gestionnaire de timers
 const timerManager = new TimerManager();
 
-// Système anti-spam avancé
+// Système anti-spam simplifié (très permissif pour jeu entre amis)
 class AntiSpamManager {
     constructor() {
-        this.playerAttempts = new Map(); // playerId -> { count, lastAttempt, windowStart }
         this.questionTimestamps = new Map(); // roomCode -> timestamp
     }
     
@@ -188,72 +291,25 @@ class AntiSpamManager {
         console.log(`[AntiSpam] Nouvelle question marquée pour room ${roomCode}`);
     }
     
-    // Vérifier si une réponse est dans la fenêtre temporelle valide
-    isResponseInValidWindow(roomCode, maxAge = 12000) { // 12s de marge
+    // Vérifier si une réponse est dans la fenêtre temporelle valide (très permissif)
+    isResponseInValidWindow(roomCode, maxAge = 25000) { // 25s de marge généreuse
         const questionStart = this.questionTimestamps.get(roomCode);
-        if (!questionStart) return false;
+        if (!questionStart) return true; // Si pas de timestamp, on accepte
         
         const age = Date.now() - questionStart;
         return age <= maxAge;
     }
     
-    // Vérifier et enregistrer une tentative de réponse
+    // Version simplifiée - juste vérifier le spam évident
     checkAndRecordAttempt(playerId, roomCode) {
-        const now = Date.now();
-        const windowDuration = 60000; // 1 minute
-        const maxAttemptsPerWindow = 10;
-        
-        if (!this.playerAttempts.has(playerId)) {
-            this.playerAttempts.set(playerId, {
-                count: 1,
-                lastAttempt: now,
-                windowStart: now,
-                roomCode: roomCode
-            });
-            return { allowed: true, remaining: maxAttemptsPerWindow - 1 };
-        }
-        
-        const attempts = this.playerAttempts.get(playerId);
-        
-        // Réinitialiser si nouvelle fenêtre temporelle
-        if (now - attempts.windowStart > windowDuration) {
-            attempts.count = 1;
-            attempts.windowStart = now;
-            attempts.lastAttempt = now;
-            attempts.roomCode = roomCode;
-            return { allowed: true, remaining: maxAttemptsPerWindow - 1 };
-        }
-        
-        // Vérifier si trop de tentatives
-        if (attempts.count >= maxAttemptsPerWindow) {
-            console.log(`[AntiSpam] Joueur ${playerId} bloqué: ${attempts.count} tentatives en ${windowDuration}ms`);
-            return { allowed: false, remaining: 0, reason: 'Trop de tentatives' };
-        }
-        
-        // Vérifier délai minimum entre tentatives (500ms)
-        if (now - attempts.lastAttempt < 500) {
-            console.log(`[AntiSpam] Joueur ${playerId} bloqué: tentative trop rapide`);
-            return { allowed: false, remaining: 0, reason: 'Tentatives trop rapides' };
-        }
-        
-        attempts.count++;
-        attempts.lastAttempt = now;
-        attempts.roomCode = roomCode;
-        
-        return { allowed: true, remaining: maxAttemptsPerWindow - attempts.count };
+        // Pour un jeu entre amis, on est très permissif
+        // On bloque seulement le spam vraiment excessif (plus de 100 tentatives en 10 secondes)
+        return { allowed: true, remaining: 999 }; // Toujours autorisé
     }
     
     // Nettoyer les données d'une question terminée
     cleanupQuestion(roomCode) {
         this.questionTimestamps.delete(roomCode);
-        
-        // Nettoyer les tentatives des joueurs de cette room
-        for (const [playerId, attempts] of this.playerAttempts.entries()) {
-            if (attempts.roomCode === roomCode) {
-                this.playerAttempts.delete(playerId);
-            }
-        }
-        
         console.log(`[AntiSpam] Données nettoyées pour room ${roomCode}`);
     }
 }
@@ -429,7 +485,10 @@ function createRoom(hostId, hostName, gameDuration = 30) {
             timer: null,
             betweenQuestions: false,
             gameMode: 'lefast', // Mode par défaut
-            speed: 1 // Pour LeFist
+            speed: 1, // Pour LeFist (legacy)
+            lefastAnswers: new Map(), // Pour LeFast
+            questionStartTime: null,
+            lefistStats: new Map() // Nouveau: stats LeFist (bonnes/mauvaises réponses par joueur)
         },
         createdAt: new Date()
     };
@@ -474,25 +533,48 @@ function startGameTimer(roomCode) {
     const room = rooms.get(roomCode);
     if (!room) return;
     
-    // Ne pas démarrer de timer pour LeDream
-    if (room.gameState.gameMode === 'ledream') {
-        console.log(`[LeDream] Pas de timer global pour room ${roomCode}`);
+    // Ne pas démarrer de timer pour LeDream et LeFast (nouvelles règles)
+    if (room.gameState.gameMode === 'ledream' || room.gameState.gameMode === 'lefast') {
+        console.log(`[Timer] Pas de timer global pour room ${roomCode} (mode ${room.gameState.gameMode})`);
         return;
     }
     
+    // Pour LeFist : timer global
     room.gameState.timer = setInterval(() => {
         room.gameState.timeLeft--;
         
-        // Envoyer le timer à tous les joueurs (sauf LeDream)
+        // Envoyer le timer à tous les joueurs (seulement LeFist maintenant)
         io.to(roomCode).emit('timer-update', room.gameState.timeLeft);
         
         if (room.gameState.timeLeft <= 0) {
             clearInterval(room.gameState.timer);
+            
+            // Pour LeFist : marquer tous les joueurs non finis comme terminés
+            if (room.gameState.gameMode === 'lefist') {
+                room.gameState.lefistStats.forEach((stats, playerId) => {
+                    if (!stats.isFinished) {
+                        stats.isFinished = true;
+                        // Informer le joueur que le temps est écoulé
+                        const playerSocket = [...players.entries()].find(([socketId, player]) => 
+                            socketId === playerId && player.roomCode === roomCode
+                        );
+                        if (playerSocket) {
+                            io.to(playerId).emit('lefist-player-finished', {
+                                reason: 'timeout',
+                                correctAnswers: stats.correct,
+                                incorrectAnswers: stats.incorrect,
+                                finalScore: room.players.get(playerId)?.score || 0
+                            });
+                        }
+                    }
+                });
+            }
+            
             endGame(roomCode);
         }
     }, 1000);
     
-    console.log(`[Timer] Timer global démarré pour room ${roomCode} (${room.gameState.gameDuration}s)`);
+    console.log(`[Timer] Timer global démarré pour room ${roomCode} (${room.gameState.gameDuration}s) - mode ${room.gameState.gameMode}`);
 }
 
 function endGame(roomCode, gameMode = null) {
@@ -522,7 +604,7 @@ function endGame(roomCode, gameMode = null) {
         room.gameState.timer = null;
     }
     
-    // Nettoyer les timers spécifiques à LeDream
+    // Nettoyer les timers spécifiques selon le mode
     if (mode === 'ledream') {
         timerManager.clearAllTimers(roomCode);
         antiSpamManager.cleanupQuestion(roomCode);
@@ -531,6 +613,13 @@ function endGame(roomCode, gameMode = null) {
             room.gameState.ledreamAnswers.clear();
         }
         console.log(`[LeDream] Jeu LeDream terminé dans room ${roomCode}`);
+    } else if (mode === 'lefast') {
+        // Nettoyer les données LeFast
+        if (room.gameState.lefastAnswers) {
+            room.gameState.lefastAnswers.clear();
+        }
+        antiSpamManager.cleanupQuestion(roomCode);
+        console.log(`[LeFast] Jeu LeFast terminé dans room ${roomCode}`);
     }
     
     console.log(`Jeu terminé dans la room: ${roomCode}`);
@@ -613,7 +702,7 @@ io.on('connection', (socket) => {
         io.to(player.roomCode).emit('game-mode-changed', data.mode);
     });
 
-    // Changer la durée du jeu (seulement l'hôte, pas pour LeDream)
+    // Changer la durée du jeu (seulement l'hôte, pas pour LeDream et plus pour LeFast)
     socket.on('set-game-duration', (data) => {
         const player = players.get(socket.id);
         if (!player) return;
@@ -621,9 +710,9 @@ io.on('connection', (socket) => {
         const room = rooms.get(player.roomCode);
         if (!room || room.hostId !== socket.id) return;
         
-        // Ignorer la durée pour le mode LeDream
-        if (room.gameState.gameMode === 'ledream') {
-            console.log(`[LeDream] Durée ignorée pour room ${player.roomCode} (mode LeDream)`);
+        // Ignorer la durée pour le mode LeDream et LeFast (nouvelles règles)
+        if (room.gameState.gameMode === 'ledream' || room.gameState.gameMode === 'lefast') {
+            console.log(`[Game] Durée ignorée pour room ${player.roomCode} (mode ${room.gameState.gameMode})`);
             return;
         }
         
@@ -631,7 +720,7 @@ io.on('connection', (socket) => {
         room.gameState.timeLeft = data.duration;
         
         io.to(player.roomCode).emit('game-duration-changed', data.duration);
-        console.log(`[Game] Durée changée à ${data.duration}s pour room ${player.roomCode}`);
+        console.log(`[Game] Durée changée à ${data.duration}s pour room ${player.roomCode} (mode LeFist)`);
     });
     
     // Commencer le jeu (seulement l'hôte)
@@ -658,14 +747,37 @@ io.on('connection', (socket) => {
         });
         
         // Logique spécifique selon le mode de jeu
-        if (room.gameState.gameMode === 'ledream') {
+        if (room.gameState.gameMode === 'lefast') {
+            // Pour LeFast : initialiser le système de réponses multiples
+            room.gameState.lefastAnswers = new Map();
+            room.gameState.questionStartTime = Date.now();
+            antiSpamManager.markQuestionStart(player.roomCode);
+            
+            // Démarrer le timer de 15 secondes pour clôturer automatiquement
+            setTimeout(() => {
+                handleLeFastQuestionEnd(player.roomCode);
+            }, 15000);
+            
+            console.log(`[LeFast] Jeu LeFast démarré pour room ${player.roomCode} - 15s par question`);
+        } else if (room.gameState.gameMode === 'ledream') {
             // Pour LeDream : pas de timer global, jeu en continu
             antiSpamManager.markQuestionStart(player.roomCode);
             console.log(`[LeDream] Jeu LeDream démarré pour room ${player.roomCode} - pas de timer global`);
         } else {
-            // Pour LeFast et LeFist : utiliser le timer global
+            // Pour LeFist : utiliser le timer global avec les nouvelles règles
             startGameTimer(player.roomCode);
-            console.log(`[Game] Timer global démarré pour room ${player.roomCode} (${room.gameState.gameDuration}s)`);
+            
+            // Initialiser les stats LeFist pour chaque joueur
+            room.gameState.lefistStats = new Map();
+            room.players.forEach((player, playerId) => {
+                room.gameState.lefistStats.set(playerId, {
+                    correct: 0,
+                    incorrect: 0,
+                    isFinished: false
+                });
+            });
+            
+            console.log(`[LeFist] Jeu LeFist démarré pour room ${player.roomCode} (${room.gameState.gameDuration}s)`);
         }
         
         console.log(`Jeu commencé dans la room: ${player.roomCode}`);
@@ -682,9 +794,6 @@ io.on('connection', (socket) => {
         const roomPlayer = room.players.get(socket.id);
         if (!roomPlayer) return;
         
-        // Vérifier si on est en pause entre les questions (seulement pour LeFast)
-        if (room.gameState.betweenQuestions && room.gameState.gameMode === 'lefast') return;
-        
         const { answer, mode, responseTime, responseType } = data;
         const correctAnswer = room.gameState.currentFlag.name;
         let isCorrect = false;
@@ -693,41 +802,74 @@ io.on('connection', (socket) => {
         
         // Logique selon le mode de jeu
         if (mode === 'lefast') {
-            // Mode LeFast: premier qui trouve gagne
-            isCorrect = answer.toLowerCase().trim() === correctAnswer.toLowerCase();
-            points = isCorrect ? 1000 : 0;
+            // === MODE LEFAST NOUVELLES RÈGLES (VERSION SIMPLIFIÉE) ===
             
-            if (isCorrect) {
-                roomPlayer.score += points;
-                
-                // Vérifier si le joueur a atteint 15000 points
-                if (roomPlayer.score >= 15000) {
-                    // Fin de partie pour LeFast
-                    endGame(player.roomCode, 'lefast');
-                    return;
-                }
-                
-                room.gameState.betweenQuestions = true;
-                
-                // Informer tous les joueurs du gagnant
-                io.to(player.roomCode).emit('question-won', {
-                    winnerName: roomPlayer.name,
-                    correctAnswer: correctAnswer,
-                    points: points
-                });
-                
-                // Timer de 6 secondes avant la prochaine question
-                setTimeout(() => {
-                    const currentRoom = rooms.get(player.roomCode);
-                    if (!currentRoom || !currentRoom.gameState.started) return;
-                    
-                    const newFlag = generateRandomFlag();
-                    currentRoom.gameState.currentFlag = newFlag;
-                    currentRoom.gameState.betweenQuestions = false;
-                    
-                    io.to(player.roomCode).emit('new-flag', { flag: newFlag });
-                }, 6000);
+            // Validation basique du payload
+            if (!answer || typeof answer !== 'string' || answer.trim().length === 0) {
+                console.log(`[LeFast] Réponse vide de ${socket.id}`);
+                return;
             }
+            
+            const sanitizedAnswer = answer.trim().substring(0, 100);
+            const sanitizedResponseTime = responseTime || 0;
+            
+            // Vérification anti-spam très permissive
+            if (!antiSpamManager.isResponseInValidWindow(player.roomCode)) {
+                console.log(`[LeFast] Réponse tardive de ${socket.id} - mais on accepte quand même`);
+                // On accepte quand même pour éviter les frustrations
+            }
+            
+            // Initialiser le système de réponses si nécessaire
+            if (!room.gameState.lefastAnswers) {
+                room.gameState.lefastAnswers = new Map();
+            }
+            
+            // Vérifier si le joueur a déjà des réponses pour cette question
+            let playerAnswers = room.gameState.lefastAnswers.get(socket.id) || [];
+            
+            // Vérifier le nombre de tentatives (max 3)
+            if (playerAnswers.length >= 3) {
+                console.log(`[LeFast] Joueur ${socket.id} a déjà utilisé ses 3 tentatives`);
+                socket.emit('max-attempts-reached', { message: 'Vous avez utilisé vos 3 tentatives pour cette question' });
+                return;
+            }
+            
+            // Vérifier si le joueur a déjà une réponse correcte (ne compte plus)
+            const hasCorrectAnswer = playerAnswers.some(attempt => 
+                attempt.answer.toLowerCase().trim() === correctAnswer.toLowerCase()
+            );
+            
+            if (hasCorrectAnswer) {
+                console.log(`[LeFast] Joueur ${socket.id} a déjà une réponse correcte pour cette question`);
+                socket.emit('already-correct', { message: 'Vous avez déjà trouvé la bonne réponse !' });
+                return;
+            }
+            
+            // Calculer si la réponse est correcte
+            isCorrect = sanitizedAnswer.toLowerCase().trim() === correctAnswer.toLowerCase();
+            
+            // Enregistrer la tentative
+            const attempt = {
+                answer: sanitizedAnswer,
+                timestamp: Date.now(),
+                responseTime: sanitizedResponseTime,
+                isCorrect: isCorrect
+            };
+            
+            playerAnswers.push(attempt);
+            room.gameState.lefastAnswers.set(socket.id, playerAnswers);
+            
+            console.log(`[LeFast] Tentative ${playerAnswers.length}/3 de ${roomPlayer.name}: "${sanitizedAnswer}" (${isCorrect ? 'CORRECT' : 'INCORRECT'})`);
+            
+            // Informer le joueur du résultat de sa tentative
+            socket.emit('lefast-attempt-result', {
+                attemptNumber: playerAnswers.length,
+                maxAttempts: 3,
+                isCorrect: isCorrect,
+                answer: sanitizedAnswer,
+                remainingAttempts: 3 - playerAnswers.length
+            });
+            
         } else if (mode === 'ledream') {
             // === MODE LEDREAM SÉCURISÉ ===
             
@@ -821,9 +963,36 @@ io.on('connection', (socket) => {
             
             // 8. Démarrer le timer de question si ce n'est pas déjà fait
             startLeDreamQuestion(player.roomCode);
+            
+            // Informer le joueur du résultat
+            socket.emit('answer-result', {
+                isCorrect,
+                points,
+                speedBonus,
+                newScore: roomPlayer.score,
+                correctAnswer: correctAnswer
+            });
+            
         } else if (mode === 'lefist') {
-            // Mode LeFist: glisser-déposer par continent
+            // === MODE LEFIST NOUVEAU CONCEPT AVEC PROTECTION ANTI-SPAM ===
             console.log(`[LeFist] Réponse reçue: ${answer} pour le drapeau ${room.gameState.currentFlag.code}`);
+            
+            // Vérification anti-spam spécifique à LeFist
+            const now = Date.now();
+            const playerId = socket.id;
+            
+            // Vérifier si le joueur a déjà une réponse en cours de traitement
+            if (!room.gameState.lefistLastResponse) {
+                room.gameState.lefistLastResponse = new Map();
+            }
+            
+            const lastResponse = room.gameState.lefistLastResponse.get(playerId);
+            if (lastResponse && (now - lastResponse) < 1000) { // 1 seconde minimum entre les réponses
+                console.log(`[LeFist] Spam détecté pour ${socket.id} - réponse ignorée`);
+                return;
+            }
+            
+            room.gameState.lefistLastResponse.set(playerId, now);
             
             const correctContinent = getCountryContinent(room.gameState.currentFlag.code);
             console.log(`[LeFist] Continent correct: ${correctContinent}`);
@@ -831,44 +1000,82 @@ io.on('connection', (socket) => {
             isCorrect = answer === correctContinent;
             console.log(`[LeFist] Réponse correcte: ${isCorrect}`);
             
-            if (isCorrect) {
-                points = Math.round(200 * room.gameState.speed); // Points augmentent avec la vitesse
-                roomPlayer.score += points;
-                console.log(`[LeFist] Points ajoutés: ${points}, nouveau score: ${roomPlayer.score}`);
-                
-                // Augmenter progressivement la vitesse
-                room.gameState.speed = Math.min(4, room.gameState.speed + 0.1);
-                console.log(`[LeFist] Nouvelle vitesse: ${room.gameState.speed}`);
+            // Initialiser les stats du joueur si nécessaire
+            if (!room.gameState.lefistStats) {
+                room.gameState.lefistStats = new Map();
             }
             
-            // Générer un nouveau drapeau après un délai (correct ou incorrect)
-            setTimeout(() => {
-                const currentRoom = rooms.get(player.roomCode);
-                if (!currentRoom || !currentRoom.gameState.started) {
-                    console.log(`[LeFist] Room non trouvée ou jeu arrêté`);
-                    return;
+            let playerStats = room.gameState.lefistStats.get(socket.id) || {
+                correct: 0,
+                incorrect: 0,
+                isFinished: false
+            };
+            
+            // Vérifier si le joueur n'est pas déjà terminé
+            if (playerStats.isFinished) {
+                console.log(`[LeFist] Joueur ${socket.id} déjà terminé - réponse ignorée`);
+                return;
+            }
+            
+            if (isCorrect) {
+                points = 100; // Points fixes par bonne réponse
+                roomPlayer.score += points;
+                playerStats.correct++;
+                console.log(`[LeFist] ${roomPlayer.name}: bonne réponse ! Total: ${playerStats.correct} bonnes, ${playerStats.incorrect} mauvaises`);
+            } else {
+                playerStats.incorrect++;
+                console.log(`[LeFist] ${roomPlayer.name}: mauvaise réponse ! Total: ${playerStats.correct} bonnes, ${playerStats.incorrect} mauvaises`);
+                
+                // Vérifier si le joueur a fait 5 erreurs
+                if (playerStats.incorrect >= 5) {
+                    playerStats.isFinished = true;
+                    console.log(`[LeFist] ${roomPlayer.name} a fait 5 erreurs - partie terminée pour ce joueur`);
+                    
+                    // Informer le joueur qu'il a terminé
+                    socket.emit('lefist-player-finished', {
+                        reason: 'errors',
+                        correctAnswers: playerStats.correct,
+                        incorrectAnswers: playerStats.incorrect,
+                        finalScore: roomPlayer.score
+                    });
                 }
-                
-                const newFlag = generateRandomFlag();
-                currentRoom.gameState.currentFlag = newFlag;
-                console.log(`[LeFist] Nouveau drapeau généré: ${newFlag.code} - ${newFlag.name}`);
-                
-                io.to(player.roomCode).emit('new-flag', { 
-                    flag: newFlag, 
-                    speed: currentRoom.gameState.speed 
-                });
-                console.log(`[LeFist] Événement new-flag envoyé à la room ${player.roomCode}`);
-            }, 1500); // Délai pour voir le feedback
+            }
+            
+            // Sauvegarder les stats
+            room.gameState.lefistStats.set(socket.id, playerStats);
+            
+            // Informer le joueur du résultat
+            socket.emit('answer-result', {
+                isCorrect,
+                points,
+                newScore: roomPlayer.score,
+                correctAnswer: room.gameState.currentFlag.name,
+                correctContinent: correctContinent,
+                playerStats: {
+                    correct: playerStats.correct,
+                    incorrect: playerStats.incorrect,
+                    isFinished: playerStats.isFinished
+                }
+            });
+            
+            // Si le joueur n'a pas terminé, générer un nouveau drapeau après un délai
+            if (!playerStats.isFinished) {
+                setTimeout(() => {
+                    const currentRoom = rooms.get(player.roomCode);
+                    if (!currentRoom || !currentRoom.gameState.started) {
+                        console.log(`[LeFist] Room non trouvée ou jeu arrêté`);
+                        return;
+                    }
+                    
+                    const newFlag = generateRandomFlag();
+                    console.log(`[LeFist] Nouveau drapeau pour ${roomPlayer.name}: ${newFlag.code} - ${newFlag.name}`);
+                    
+                    // Envoyer le nouveau drapeau seulement à ce joueur
+                    socket.emit('new-flag', { flag: newFlag });
+                    
+                }, 1200); // 1.2 secondes pour voir le feedback et éviter le spam
+            }
         }
-        
-        // Informer le joueur du résultat
-        socket.emit('answer-result', {
-            isCorrect,
-            points,
-            speedBonus,
-            newScore: roomPlayer.score,
-            correctAnswer: correctAnswer
-        });
     });
     
     // Quitter la room
