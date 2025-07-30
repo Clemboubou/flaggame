@@ -1671,3 +1671,277 @@
     margin: 5px 0;
     font-size: 1.1rem;
   }
+
+/* ===============================
+   LERYTHM IMPROVED STYLES
+   =============================== */
+
+/* Enhanced Game Container */
+#lerythmScreen .lerythm-game-container {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-attachment: fixed;
+}
+
+/* Enhanced Game Header */
+#lerythmScreen .lerythm-game-header {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 40px;
+  align-items: center;
+  z-index: 100;
+}
+
+#lerythmScreen .lerythm-score-display {
+  background: rgba(255,255,255,0.25);
+  padding: 12px 24px;
+  border-radius: 25px;
+  backdrop-filter: blur(15px);
+  font-weight: 800;
+  font-size: 1.3rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+}
+
+#lerythmScreen .lerythm-combo-display {
+  background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.4s ease;
+  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.3);
+}
+
+#lerythmScreen .lerythm-combo-display.active {
+  opacity: 1;
+  transform: scale(1);
+  animation: comboPulse 0.6s ease;
+}
+
+@keyframes comboPulse {
+  0% { transform: scale(0.8); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+#lerythmScreen .lerythm-multiplier {
+  position: fixed;
+  top: 85px;
+  right: 30px;
+  background: linear-gradient(45deg, #feca57, #ff9ff3);
+  padding: 12px 20px;
+  border-radius: 25px;
+  font-weight: 900;
+  font-size: 1.1rem;
+  color: #2c2c2c;
+  box-shadow: 0 8px 25px rgba(254, 202, 87, 0.4);
+}
+
+/* Enhanced Lanes */
+#lerythmScreen .lerythm-lanes {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 0 20px;
+}
+
+#lerythmScreen .lerythm-lane {
+  width: 95px;
+  height: 100vh;
+  position: relative;
+  background: linear-gradient(to bottom, 
+    rgba(255,255,255,0.03) 0%, 
+    rgba(255,255,255,0.08) 70%, 
+    rgba(255,255,255,0.15) 100%);
+  border: 2px solid rgba(255,255,255,0.25);
+  border-radius: 15px 15px 0 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  overflow: hidden;
+  backdrop-filter: blur(5px);
+}
+
+#lerythmScreen .lerythm-hit-zone {
+  width: 85px;
+  height: 85px;
+  background: linear-gradient(45deg, rgba(255,255,255,0.3), rgba(255,255,255,0.2));
+  border: 4px solid rgba(255,255,255,0.6);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0; /* Hide letters */
+  font-weight: 900;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+  margin-bottom: 25px;
+  position: relative;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  transition: all 0.3s ease;
+}
+
+#lerythmScreen .lerythm-hit-zone.hit {
+  background: linear-gradient(45deg, #4ecdc4, #44a08d);
+  border-color: #4ecdc4;
+  transform: scale(1.2);
+  box-shadow: 0 0 30px rgba(78, 205, 196, 0.9);
+  animation: lerythmEnhancedHit 0.5s ease;
+}
+
+@keyframes lerythmEnhancedHit {
+  0% { transform: scale(1.2); box-shadow: 0 0 30px rgba(78, 205, 196, 0.9); }
+  25% { transform: scale(1.3); box-shadow: 0 0 40px rgba(78, 205, 196, 1); }
+  75% { transform: scale(1.25); box-shadow: 0 0 35px rgba(78, 205, 196, 0.95); }
+  100% { transform: scale(1.2); box-shadow: 0 0 30px rgba(78, 205, 196, 0.9); }
+}
+
+/* Enhanced Falling Flags */
+#lerythmScreen .lerythm-flag {
+  position: absolute;
+  width: 80px;
+  top: -120px;
+  left: 50%;
+  transform: translateX(-50%);
+  animation: enhancedFallDown linear;
+  cursor: pointer;
+  z-index: 10;
+}
+
+#lerythmScreen .lerythm-flag img {
+  width: 100%;
+  height: 55px;
+  object-fit: cover;
+  border-radius: 10px;
+  display: block;
+  background: white;
+  padding: 3px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  border: 3px solid rgba(255,255,255,0.95);
+  transition: transform 0.2s ease;
+}
+
+#lerythmScreen .lerythm-flag:hover img {
+  transform: scale(1.05);
+}
+
+@keyframes enhancedFallDown {
+  from { top: -120px; }
+  to { top: calc(100vh - 110px); }
+}
+
+/* Enhanced Feedback */
+#lerythmScreen .lerythm-feedback {
+  position: fixed;
+  top: 45%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 3rem;
+  font-weight: 900;
+  text-shadow: 4px 4px 8px rgba(0,0,0,0.8);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 200;
+}
+
+#lerythmScreen .lerythm-feedback.show {
+  animation: lerythmEnhancedFeedback 1.4s ease;
+}
+
+@keyframes lerythmEnhancedFeedback {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(-10deg); }
+  10% { opacity: 1; transform: translate(-50%, -50%) scale(1.4) rotate(5deg); }
+  20% { transform: translate(-50%, -50%) scale(1.2) rotate(-2deg); }
+  30% { transform: translate(-50%, -50%) scale(1.1) rotate(1deg); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.7) rotate(0deg); }
+}
+
+#lerythmScreen .lerythm-feedback.perfect { 
+  color: #f39c12; 
+  text-shadow: 0 0 30px #f39c12, 4px 4px 8px rgba(0,0,0,0.8); 
+}
+#lerythmScreen .lerythm-feedback.good { 
+  color: #2ecc71; 
+  text-shadow: 0 0 30px #2ecc71, 4px 4px 8px rgba(0,0,0,0.8); 
+}
+#lerythmScreen .lerythm-feedback.ok { 
+  color: #3498db; 
+  text-shadow: 0 0 30px #3498db, 4px 4px 8px rgba(0,0,0,0.8); 
+}
+#lerythmScreen .lerythm-feedback.miss { 
+  color: #e74c3c; 
+  text-shadow: 0 0 30px #e74c3c, 4px 4px 8px rgba(0,0,0,0.8); 
+}
+
+/* Enhanced Game Over Screen */
+#lerythmScreen .lerythm-game-over-screen {
+  background: rgba(0,0,0,0.95);
+  backdrop-filter: blur(10px);
+}
+
+#lerythmScreen .lerythm-game-over-screen h2 {
+  font-size: 3rem;
+  margin-bottom: 25px;
+  background: linear-gradient(45deg, #f39c12, #e67e22);
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+#lerythmScreen .lerythm-final-score {
+  font-size: 2.8rem;
+  margin-bottom: 30px;
+  color: #f39c12;
+  font-weight: 900;
+  text-shadow: 0 0 20px rgba(243, 156, 18, 0.5);
+}
+
+#lerythmScreen .lerythm-stats {
+  background: rgba(255,255,255,0.15);
+  padding: 30px;
+  border-radius: 25px;
+  margin-bottom: 30px;
+  text-align: center;
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+#lerythmScreen .lerythm-stats div {
+  margin: 10px 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+/* Responsive Enhancements */
+@media (max-width: 768px) {
+  #lerythmScreen .lerythm-lane {
+    width: 75px;
+  }
+  
+  #lerythmScreen .lerythm-hit-zone {
+    width: 65px;
+    height: 65px;
+  }
+  
+  #lerythmScreen .lerythm-flag {
+    width: 65px;
+  }
+  
+  #lerythmScreen .lerythm-game-header {
+    gap: 20px;
+    font-size: 0.9rem;
+  }
+  
+  #lerythmScreen .lerythm-feedback {
+    font-size: 2.2rem;
+  }
+}
