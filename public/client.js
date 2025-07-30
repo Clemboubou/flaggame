@@ -28,6 +28,86 @@ let gameState = {
   speed: 1
 };
 
+// État pour LeRythm
+let lerythmGameState = {
+  isPlaying: false,
+  gameOver: false,
+  score: 0,
+  combo: 0,
+  multiplier: 1,
+  stats: { perfect: 0, good: 0, ok: 0, miss: 0 },
+  flags: [],
+  spawnTimer: null,
+  gameTimer: null,
+  startTime: null
+};
+
+const lerythmConfig = {
+  fallSpeed: 3000,
+  spawnRate: 1200,
+  hitZoneY: 0, // Will be calculated
+  perfectWindow: 40,
+  goodWindow: 80,
+  okWindow: 120,
+  lanes: 8,
+  keys: ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i'],
+  scoring: {
+    perfect: 300,
+    good: 200,
+    ok: 100
+  }
+};
+
+const lerythmCountriesByLetter = {
+  'Q': [
+    { name:'Qatar', code:'qa' }
+  ],
+  'W': [
+    { name:'Wallis-et-Futuna', code:'wf' }
+  ],
+  'E': [
+    { name:'Espagne', code:'es' },
+    { name:'États-Unis', code:'us' },
+    { name:'Estonie', code:'ee' },
+    { name:'Éthiopie', code:'et' },
+    { name:'Équateur', code:'ec' },
+    { name:'Égypte', code:'eg' }
+  ],
+  'R': [
+    { name:'Russie', code:'ru' },
+    { name:'Roumanie', code:'ro' },
+    { name:'Rwanda', code:'rw' },
+    { name:'République tchèque', code:'cz' }
+  ],
+  'T': [
+    { name:'Turquie', code:'tr' },
+    { name:'Tunisie', code:'tn' },
+    { name:'Thaïlande', code:'th' },
+    { name:'Taiwan', code:'tw' }
+  ],
+  'Y': [
+    { name:'Yémen', code:'ye' }
+  ],
+  'U': [
+    { name:'Ukraine', code:'ua' },
+    { name:'Uruguay', code:'uy' },
+    { name:'Ouganda', code:'ug' },
+    { name:'Uzbekistan', code:'uz' }
+  ],
+  'I': [
+    { name:'Italie', code:'it' },
+    { name:'Inde', code:'in' },
+    { name:'Irlande', code:'ie' },
+    { name:'Islande', code:'is' },
+    { name:'Israël', code:'il' },
+    { name:'Iran', code:'ir' },
+    { name:'Irak', code:'iq' },
+    { name:'Indonésie', code:'id' }
+  ]
+};
+
+const lerythmAllCountries = Object.values(lerythmCountriesByLetter).flat();
+
 // === UTILITAIRES UI ===
 function updateConnectionStatus(connected) {
   const status = document.getElementById('connectionStatus');
@@ -118,6 +198,11 @@ function updateGameModeUI(mode) {
     ledreamInfo.style.display = 'none';
     if (lefastInfo) lefastInfo.style.display = 'none';
     if (lefistInfo) lefistInfo.style.display = 'block';
+  } else if (mode === 'lerythm') {
+    durationOptions.style.display = 'flex';
+    ledreamInfo.style.display = 'none';
+    if (lefastInfo) lefastInfo.style.display = 'none';
+    if (lefistInfo) lefistInfo.style.display = 'none';
   } else {
     durationOptions.style.display = 'flex';
     ledreamInfo.style.display = 'none';
@@ -181,6 +266,11 @@ function updateScore(score, mode) {
   if (mode === 'lefast') document.getElementById('lefastScore').textContent = score;
   else if (mode === 'ledream') document.getElementById('ledreamScore').textContent = score;
   else if (mode === 'lefist') document.getElementById('lefistScore').textContent = score;
+  else if (mode === 'lerythm') {
+    // LeRythm gère son propre score via updateLerythmUI()
+    lerythmGameState.score = score;
+    updateLerythmUI();
+  }
 }
 
 // === AFFICHAGE NOUVEAU DRAPEAU ===
@@ -215,6 +305,9 @@ function displayNewFlag(flag) {
     startLedreamTimer();
   } else if (currentGameMode === 'lefist') {
     showLefistFlag(flag);
+  } else if (currentGameMode === 'lerythm') {
+    // LeRythm ne gère pas les drapeaux individuels, il les génère automatiquement
+    // Pas d'action nécessaire ici
   }
 }
 
@@ -667,6 +760,248 @@ function showLefistFeedback(message, isCorrect, correctContinent = null) {
   setTimeout(() => feedback.classList.remove('show'), 1200);
 }
 
+// === LERYTHM FUNCTIONS ===
+function lerythmFirstLetterNormalized(countryName) {
+  const trimmed = countryName.trim();
+  if (!trimmed) return '';
+  const normalized = trimmed.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // supprime accents
+  return normalized[0].toUpperCase();
+}
+
+function lerythmRandOf(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function startLerythmGame() {
+  if (currentGameMode !== 'lerythm') return;
+  
+  lerythmGameState.isPlaying = true;
+  lerythmGameState.gameOver = false;
+  lerythmGameState.startTime = Date.now();
+  lerythmGameState.score = 0;
+  lerythmGameState.combo = 0;
+  lerythmGameState.multiplier = 1;
+  lerythmGameState.stats = { perfect: 0, good: 0, ok: 0, miss: 0 };
+  lerythmGameState.flags = [];
+  
+  // Calculer la position de la hit zone
+  const container = document.querySelector('.lerythm-game-container');
+  if (container) {
+    lerythmConfig.hitZoneY = container.offsetHeight - 140;
+  }
+  
+  updateLerythmUI();
+  lerythmSpawnFlag();
+  
+  lerythmGameState.spawnTimer = setInterval(lerythmSpawnFlag, lerythmConfig.spawnRate);
+  lerythmGameState.gameTimer = setTimeout(endLerythmGame, gameState.gameDuration * 1000);
+}
+
+function lerythmSpawnFlag() {
+  if (!gameState.gameStarted || lerythmGameState.gameOver) return;
+  
+  // Choisir une lettre aléatoire parmi Q W E R T Y U I
+  const letters = Object.keys(lerythmCountriesByLetter);
+  const randomLetter = letters[Math.floor(Math.random() * letters.length)];
+  const countriesForLetter = lerythmCountriesByLetter[randomLetter];
+  
+  if (!countriesForLetter || countriesForLetter.length === 0) return;
+  
+  // Choisir un pays aléatoire pour cette lettre
+  const country = countriesForLetter[Math.floor(Math.random() * countriesForLetter.length)];
+  
+  // Trouver la piste correspondant à la lettre
+  const laneIndex = lerythmConfig.keys.indexOf(randomLetter.toLowerCase());
+  if (laneIndex === -1) return;
+  
+  const flag = {
+    id: Date.now() + Math.random(),
+    lane: laneIndex,
+    country,
+    expectedKey: randomLetter.toLowerCase(),
+    y: -50,
+    element: null,
+    startTime: Date.now()
+  };
+  
+  // Créer l'élément DOM
+  const flagElement = document.createElement('div');
+  flagElement.className = 'lerythm-flag';
+  flagElement.innerHTML = `<img src="https://flagpedia.net/data/flags/w580/${country.code}.png" alt="${country.name}">`;
+  flagElement.style.position = 'absolute';
+  flagElement.style.left = '50%';
+  flagElement.style.transform = 'translateX(-50%)';
+  flagElement.style.top = '-50px';
+  flagElement.style.animation = 'fallDown 3s linear forwards';
+  
+  const laneElement = document.querySelector(`[data-lane="${laneIndex}"]`);
+  if (laneElement) {
+    laneElement.appendChild(flagElement);
+    flag.element = flagElement;
+    lerythmGameState.flags.push(flag);
+  }
+  
+  // Nettoyage en fin de chute -> raté
+  const removalTimeout = lerythmConfig.fallSpeed + 100;
+  setTimeout(() => {
+    if (flagElement && flagElement.parentNode) {
+      flagElement.remove();
+      lerythmGameState.flags = lerythmGameState.flags.filter(f => f.element !== flagElement);
+      lerythmHandleMiss();
+    }
+  }, removalTimeout);
+}
+
+function lerythmHandleKeyPress(event) {
+  if (!gameState.gameStarted || lerythmGameState.gameOver) return;
+  
+  const key = event.key.toLowerCase();
+  if (!lerythmConfig.keys.includes(key)) return;
+  
+  const laneIndex = lerythmConfig.keys.indexOf(key);
+  
+  let closestFlag = null;
+  let closestDistance = Infinity;
+  
+  lerythmGameState.flags.forEach(flag => {
+    if (flag.lane === laneIndex && flag.element && flag.expectedKey === key) {
+      const flagRect = flag.element.getBoundingClientRect();
+      const hitZone = document.querySelector(`[data-lane="${laneIndex}"] .lerythm-hit-zone`);
+      if (!hitZone) return;
+      
+      const hitZoneRect = hitZone.getBoundingClientRect();
+      const distance = Math.abs(flagRect.bottom - hitZoneRect.top);
+      
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestFlag = flag;
+      }
+    }
+  });
+  
+  if (!closestFlag) {
+    lerythmHandleMiss();
+    return;
+  }
+  
+  // Calculer la précision selon les nouvelles valeurs
+  let points = 0;
+  let feedback = '';
+  let feedbackType = '';
+  
+  if (closestDistance <= lerythmConfig.perfectWindow) {
+    points = lerythmConfig.scoring.perfect; // 300
+    lerythmGameState.stats.perfect++;
+    feedback = 'PARFAIT!';
+    feedbackType = 'perfect';
+  } else if (closestDistance <= lerythmConfig.goodWindow) {
+    points = lerythmConfig.scoring.good; // 200
+    lerythmGameState.stats.good++;
+    feedback = 'BIEN!';
+    feedbackType = 'good';
+  } else if (closestDistance <= lerythmConfig.okWindow) {
+    points = lerythmConfig.scoring.ok; // 100
+    lerythmGameState.stats.ok++;
+    feedback = 'OK';
+    feedbackType = 'ok';
+  } else {
+    lerythmHandleMiss();
+    return;
+  }
+  
+  // Supprimer le drapeau touché
+  if (closestFlag.element) {
+    closestFlag.element.remove();
+  }
+  lerythmGameState.flags = lerythmGameState.flags.filter(f => f.id !== closestFlag.id);
+  
+  // Combo & multiplicateur (max x5, augmente tous les 10 combos)
+  lerythmGameState.combo++;
+  lerythmGameState.multiplier = Math.min(5, Math.floor(lerythmGameState.combo / 10) + 1);
+  
+  // Score avec multiplicateur
+  lerythmGameState.score += points * lerythmGameState.multiplier;
+  
+  // Feedback et mise à jour UI
+  lerythmShowFeedback(feedback, feedbackType);
+  updateLerythmCombo();
+  updateLerythmUI();
+}
+
+function lerythmHandleMiss() {
+  lerythmGameState.stats.miss++;
+  lerythmGameState.combo = 0;
+  lerythmGameState.multiplier = 1;
+  updateLerythmCombo();
+  updateLerythmUI();
+  lerythmShowFeedback('RATÉ!', 'miss');
+}
+
+function lerythmShowFeedback(text, type) {
+  const feedback = document.getElementById('lerythmFeedback');
+  feedback.textContent = text;
+  feedback.className = `lerythm-feedback ${type} show`;
+  setTimeout(() => feedback.classList.remove('show'), 1000);
+}
+
+function updateLerythmCombo() {
+  const comboElement = document.getElementById('lerythmCombo');
+  const comboCount = document.getElementById('lerythmComboCount');
+  
+  if (comboCount) comboCount.textContent = lerythmGameState.combo;
+  if (comboElement) {
+    if (lerythmGameState.combo > 5) comboElement.classList.add('active');
+    else comboElement.classList.remove('active');
+  }
+}
+
+function updateLerythmUI() {
+  const scoreElement = document.getElementById('lerythmScore');
+  const multiplierElement = document.getElementById('lerythmMultiplier');
+  
+  if (scoreElement) scoreElement.textContent = lerythmGameState.score.toLocaleString();
+  if (multiplierElement) multiplierElement.textContent = lerythmGameState.multiplier;
+}
+
+function endLerythmGame() {
+  lerythmGameState.isPlaying = false;
+  clearInterval(lerythmGameState.spawnTimer);
+  clearTimeout(lerythmGameState.gameTimer);
+  
+  // Nettoyer les restes
+  lerythmGameState.fallingFlags.forEach(f => f.element.remove());
+  lerythmGameState.fallingFlags = [];
+  
+  // Calculer la précision
+  const total = lerythmGameState.stats.perfect + lerythmGameState.stats.good + lerythmGameState.stats.ok + lerythmGameState.stats.miss;
+  const accuracy = total > 0 ? Math.round(((total - lerythmGameState.stats.miss) / total) * 100) : 0;
+  
+  // Afficher les résultats
+  const finalScoreElement = document.getElementById('lerythmFinalScore');
+  const perfectCountElement = document.getElementById('lerythmPerfectCount');
+  const goodCountElement = document.getElementById('lerythmGoodCount');
+  const okCountElement = document.getElementById('lerythmOkCount');
+  const missCountElement = document.getElementById('lerythmMissCount');
+  const accuracyElement = document.getElementById('lerythmAccuracy');
+  
+  if (finalScoreElement) finalScoreElement.textContent = lerythmGameState.score.toLocaleString();
+  if (perfectCountElement) perfectCountElement.textContent = lerythmGameState.stats.perfect;
+  if (goodCountElement) goodCountElement.textContent = lerythmGameState.stats.good;
+  if (okCountElement) okCountElement.textContent = lerythmGameState.stats.ok;
+  if (missCountElement) missCountElement.textContent = lerythmGameState.stats.miss;
+  if (accuracyElement) accuracyElement.textContent = accuracy;
+  
+  const gameOverScreen = document.getElementById('lerythmGameOverScreen');
+  if (gameOverScreen) gameOverScreen.style.display = 'flex';
+  
+  // Envoyer le score final au serveur
+  socket.emit('lerythm-game-finished', { 
+    score: lerythmGameState.score,
+    stats: lerythmGameState.stats,
+    accuracy: accuracy
+  });
+}
+
 // === SOCKET.IO — ÉVÉNEMENTS ===
 socket.on('connect', () => updateConnectionStatus(true));
 socket.on('disconnect', () => updateConnectionStatus(false));
@@ -760,6 +1095,9 @@ socket.on('game-started', (data) => {
     document.getElementById('lefistTimer').textContent = data.timeLeft;
     lefistPlayerStats = { correct: 0, incorrect: 0, isFinished: false };
     updateLefistStats(lefistPlayerStats);
+  } else if (currentGameMode === 'lerythm') {
+    showScreen('lerythmScreen');
+    startLerythmGame();
   }
   showNotification('Le jeu commence !');
 });
@@ -966,6 +1304,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const ledreamInput = document.getElementById('ledreamTextInput');
   if (ledreamInput) ledreamInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') submitLedreamTextAnswer(); });
+
+  // Gestionnaire d'événements clavier pour LeRythm
+  document.addEventListener('keydown', (e) => {
+    if (currentGameMode === 'lerythm' && gameState.gameStarted) {
+      lerythmHandleKeyPress(e);
+    }
+  });
 });
 
 // === EXPOSE FONCTIONS GLOBALES POUR onclick HTML ===

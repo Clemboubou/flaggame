@@ -51,6 +51,10 @@
             <h3><span class="mode-icon">👊</span> LeFist</h3>
             <p>Cliquez sur le bon continent pour chaque drapeau !</p>
           </div>
+          <div class="game-mode-card" data-mode="lerythm" onclick="selectGameMode('lerythm')">
+            <h3><span class="mode-icon">🎵</span> LeRythm</h3>
+            <p>Tapez la première lettre du pays au bon moment !</p>
+          </div>
         </div>
       </div>
 
@@ -224,6 +228,60 @@
     </div>
 
     <div id="lefistFeedback" class="lefist-feedback"></div>
+  </div>
+
+  <!-- Jeu LeRythm - RHYTHM GAME -->
+  <div id="lerythmScreen" class="screen">
+    <div class="lerythm-game-container">
+      <div class="lerythm-game-header">
+        <div class="lerythm-score-display">Score: <span id="lerythmScore">0</span></div>
+        <div class="lerythm-combo-display" id="lerythmCombo">Combo x<span id="lerythmComboCount">0</span></div>
+      </div>
+
+      <div class="lerythm-multiplier">Multiplicateur: x<span id="lerythmMultiplier">1</span></div>
+
+      <div class="lerythm-lanes" id="lerythmLanes">
+        <!-- 8 pistes pour les lettres Q W E R T Y U I -->
+        <div class="lerythm-lane" data-lane="0" data-letter="q">
+          <div class="lerythm-hit-zone">Q</div>
+        </div>
+        <div class="lerythm-lane" data-lane="1" data-letter="w">
+          <div class="lerythm-hit-zone">W</div>
+        </div>
+        <div class="lerythm-lane" data-lane="2" data-letter="e">
+          <div class="lerythm-hit-zone">E</div>
+        </div>
+        <div class="lerythm-lane" data-lane="3" data-letter="r">
+          <div class="lerythm-hit-zone">R</div>
+        </div>
+        <div class="lerythm-lane" data-lane="4" data-letter="t">
+          <div class="lerythm-hit-zone">T</div>
+        </div>
+        <div class="lerythm-lane" data-lane="5" data-letter="y">
+          <div class="lerythm-hit-zone">Y</div>
+        </div>
+        <div class="lerythm-lane" data-lane="6" data-letter="u">
+          <div class="lerythm-hit-zone">U</div>
+        </div>
+        <div class="lerythm-lane" data-lane="7" data-letter="i">
+          <div class="lerythm-hit-zone">I</div>
+        </div>
+      </div>
+
+      <div class="lerythm-feedback" id="lerythmFeedback"></div>
+
+      <div class="lerythm-game-over-screen" id="lerythmGameOverScreen" style="display: none;">
+        <h2>🎉 Partie Terminée !</h2>
+        <div class="lerythm-final-score">Score: <span id="lerythmFinalScore">0</span></div>
+        <div class="lerythm-stats">
+          <div>Parfait: <span id="lerythmPerfectCount">0</span></div>
+          <div>Bien: <span id="lerythmGoodCount">0</span></div>
+          <div>OK: <span id="lerythmOkCount">0</span></div>
+          <div>Raté: <span id="lerythmMissCount">0</span></div>
+          <div>Précision: <span id="lerythmAccuracy">0</span>%</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Dashboard universel pour tous les modes -->
