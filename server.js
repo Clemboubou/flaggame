@@ -26,44 +26,106 @@ app.get('/', (req, res) => {
 const rooms = new Map();
 const players = new Map(); // socketId -> playerData
 
-// Liste des pays et leurs codes
+// LISTE ÉTENDUE DES PAYS ET LEURS CODES (Plus de 120 pays)
 const countries = {
+    // Europe (35 pays)
     'fr': 'France', 'de': 'Allemagne', 'it': 'Italie', 'es': 'Espagne',
-    'gb': 'Royaume-Uni', 'us': 'États-Unis', 'ca': 'Canada', 'jp': 'Japon',
-    'cn': 'Chine', 'in': 'Inde', 'br': 'Brésil', 'mx': 'Mexique',
-    'au': 'Australie', 'za': 'Afrique du Sud', 'eg': 'Égypte', 'ma': 'Maroc',
-    'ng': 'Nigéria', 'ke': 'Kenya', 'gh': 'Ghana', 'se': 'Suède',
-    'no': 'Norvège', 'fi': 'Finlande', 'dk': 'Danemark', 'nl': 'Pays-Bas',
-    'be': 'Belgique', 'ch': 'Suisse', 'at': 'Autriche', 'pt': 'Portugal',
-    'gr': 'Grèce', 'tr': 'Turquie', 'ru': 'Russie', 'ua': 'Ukraine',
-    'pl': 'Pologne', 'cz': 'République tchèque', 'hu': 'Hongrie', 'ro': 'Roumanie'
+    'gb': 'Royaume-Uni', 'se': 'Suède', 'no': 'Norvège', 'fi': 'Finlande',
+    'dk': 'Danemark', 'nl': 'Pays-Bas', 'be': 'Belgique', 'ch': 'Suisse',
+    'at': 'Autriche', 'pt': 'Portugal', 'gr': 'Grèce', 'tr': 'Turquie',
+    'ru': 'Russie', 'ua': 'Ukraine', 'pl': 'Pologne', 'cz': 'République tchèque',
+    'hu': 'Hongrie', 'ro': 'Roumanie', 'bg': 'Bulgarie', 'sk': 'Slovaquie',
+    'si': 'Slovénie', 'hr': 'Croatie', 'rs': 'Serbie', 'ba': 'Bosnie-Herzégovine',
+    'me': 'Monténégro', 'mk': 'Macédoine du Nord', 'al': 'Albanie', 'ee': 'Estonie',
+    'lv': 'Lettonie', 'lt': 'Lituanie', 'ie': 'Irlande',
+
+    // Amérique du Nord (3 pays)
+    'us': 'États-Unis', 'ca': 'Canada', 'mx': 'Mexique',
+
+    // Amérique Centrale (7 pays)
+    'gt': 'Guatemala', 'bz': 'Belize', 'sv': 'Salvador', 'hn': 'Honduras',
+    'ni': 'Nicaragua', 'cr': 'Costa Rica', 'pa': 'Panama',
+
+    // Amérique du Sud (12 pays)
+    'br': 'Brésil', 'ar': 'Argentine', 'cl': 'Chili', 'pe': 'Pérou',
+    'co': 'Colombie', 've': 'Venezuela', 'ec': 'Équateur', 'bo': 'Bolivie',
+    'py': 'Paraguay', 'uy': 'Uruguay', 'gy': 'Guyana', 'sr': 'Suriname',
+
+    // Asie (25 pays)
+    'jp': 'Japon', 'cn': 'Chine', 'in': 'Inde', 'kr': 'Corée du Sud',
+    'kp': 'Corée du Nord', 'th': 'Thaïlande', 'vn': 'Vietnam', 'ph': 'Philippines',
+    'id': 'Indonésie', 'my': 'Malaisie', 'sg': 'Singapour', 'mm': 'Myanmar',
+    'la': 'Laos', 'kh': 'Cambodge', 'bn': 'Brunei', 'mn': 'Mongolie',
+    'kz': 'Kazakhstan', 'uz': 'Ouzbékistan', 'kg': 'Kirghizistan', 'tj': 'Tadjikistan',
+    'tm': 'Turkménistan', 'af': 'Afghanistan', 'pk': 'Pakistan', 'bd': 'Bangladesh',
+    'lk': 'Sri Lanka',
+
+    // Moyen-Orient (12 pays)
+    'ir': 'Iran', 'iq': 'Irak', 'sy': 'Syrie', 'lb': 'Liban',
+    'jo': 'Jordanie', 'il': 'Israël', 'ps': 'Palestine', 'sa': 'Arabie Saoudite',
+    'ae': 'Émirats Arabes Unis', 'qa': 'Qatar', 'kw': 'Koweït', 'bh': 'Bahreïn',
+
+    // Afrique (25 pays)
+    'za': 'Afrique du Sud', 'eg': 'Égypte', 'ma': 'Maroc', 'ng': 'Nigéria',
+    'ke': 'Kenya', 'gh': 'Ghana', 'et': 'Éthiopie', 'tz': 'Tanzanie',
+    'ug': 'Ouganda', 'rw': 'Rwanda', 'mz': 'Mozambique', 'zm': 'Zambie',
+    'zw': 'Zimbabwe', 'bw': 'Botswana', 'na': 'Namibie', 'ao': 'Angola',
+    'cm': 'Cameroun', 'ci': 'Côte d\'Ivoire', 'sn': 'Sénégal', 'ml': 'Mali',
+    'bf': 'Burkina Faso', 'ne': 'Niger', 'td': 'Tchad', 'dz': 'Algérie',
+    'tn': 'Tunisie',
+
+    // Océanie (5 pays)
+    'au': 'Australie', 'nz': 'Nouvelle-Zélande', 'fj': 'Fidji', 'pg': 'Papouasie-Nouvelle-Guinée',
+    'sb': 'Îles Salomon'
 };
 
 const countryNames = Object.values(countries);
 const countryCodes = Object.keys(countries);
 
-// Mapping des pays vers leurs continents pour le mode LeFist
+// Mapping étendu des pays vers leurs continents pour le mode LeFist
 const countryToContinent = {
     // Europe
     'fr': 'Europe', 'de': 'Europe', 'it': 'Europe', 'es': 'Europe',
     'gb': 'Europe', 'se': 'Europe', 'no': 'Europe', 'fi': 'Europe',
     'dk': 'Europe', 'nl': 'Europe', 'be': 'Europe', 'ch': 'Europe',
-    'at': 'Europe', 'pt': 'Portugal', 'gr': 'Europe', 'tr': 'Europe',
+    'at': 'Europe', 'pt': 'Europe', 'gr': 'Europe', 'tr': 'Europe',
     'ru': 'Europe', 'ua': 'Europe', 'pl': 'Europe', 'cz': 'Europe',
-    'hu': 'Europe', 'ro': 'Europe',
+    'hu': 'Europe', 'ro': 'Europe', 'bg': 'Europe', 'sk': 'Europe',
+    'si': 'Europe', 'hr': 'Europe', 'rs': 'Europe', 'ba': 'Europe',
+    'me': 'Europe', 'mk': 'Europe', 'al': 'Europe', 'ee': 'Europe',
+    'lv': 'Europe', 'lt': 'Europe', 'ie': 'Europe',
     
     // Amérique
-    'us': 'Amérique', 'ca': 'Amérique', 'br': 'Amérique', 'mx': 'Amérique',
+    'us': 'Amérique', 'ca': 'Amérique', 'mx': 'Amérique',
+    'gt': 'Amérique', 'bz': 'Amérique', 'sv': 'Amérique', 'hn': 'Amérique',
+    'ni': 'Amérique', 'cr': 'Amérique', 'pa': 'Amérique',
+    'br': 'Amérique', 'ar': 'Amérique', 'cl': 'Amérique', 'pe': 'Amérique',
+    'co': 'Amérique', 've': 'Amérique', 'ec': 'Amérique', 'bo': 'Amérique',
+    'py': 'Amérique', 'uy': 'Amérique', 'gy': 'Amérique', 'sr': 'Amérique',
     
     // Asie
-    'jp': 'Asie', 'cn': 'Asie', 'in': 'Asie',
+    'jp': 'Asie', 'cn': 'Asie', 'in': 'Asie', 'kr': 'Asie',
+    'kp': 'Asie', 'th': 'Asie', 'vn': 'Asie', 'ph': 'Asie',
+    'id': 'Asie', 'my': 'Asie', 'sg': 'Asie', 'mm': 'Asie',
+    'la': 'Asie', 'kh': 'Asie', 'bn': 'Asie', 'mn': 'Asie',
+    'kz': 'Asie', 'uz': 'Asie', 'kg': 'Asie', 'tj': 'Asie',
+    'tm': 'Asie', 'af': 'Asie', 'pk': 'Asie', 'bd': 'Asie',
+    'lk': 'Asie', 'ir': 'Asie', 'iq': 'Asie', 'sy': 'Asie',
+    'lb': 'Asie', 'jo': 'Asie', 'il': 'Asie', 'ps': 'Asie',
+    'sa': 'Asie', 'ae': 'Asie', 'qa': 'Asie', 'kw': 'Asie', 'bh': 'Asie',
     
     // Afrique
     'za': 'Afrique', 'eg': 'Afrique', 'ma': 'Afrique', 'ng': 'Afrique',
-    'ke': 'Afrique', 'gh': 'Afrique',
+    'ke': 'Afrique', 'gh': 'Afrique', 'et': 'Afrique', 'tz': 'Afrique',
+    'ug': 'Afrique', 'rw': 'Afrique', 'mz': 'Afrique', 'zm': 'Afrique',
+    'zw': 'Afrique', 'bw': 'Afrique', 'na': 'Afrique', 'ao': 'Afrique',
+    'cm': 'Afrique', 'ci': 'Afrique', 'sn': 'Afrique', 'ml': 'Afrique',
+    'bf': 'Afrique', 'ne': 'Afrique', 'td': 'Afrique', 'dz': 'Afrique',
+    'tn': 'Afrique',
     
     // Océanie
-    'au': 'Océanie'
+    'au': 'Océanie', 'nz': 'Océanie', 'fj': 'Océanie', 'pg': 'Océanie',
+    'sb': 'Océanie'
 };
 
 // Fonctions utilitaires
@@ -83,9 +145,9 @@ function getCountryContinent(countryCode) {
     return countryToContinent[countryCode] || 'Autre';
 }
 
-// === SYSTÈME DE GESTION DES QUESTIONS LEFAST ===
+// === SYSTÈME DE GESTION DES QUESTIONS LEFAST AMÉLIORÉ ===
 
-// Gérer la fin d'une question LeFast avec classement
+// Gérer la fin d'une question LeFast avec classement détaillé
 function handleLeFastQuestionEnd(roomCode) {
     const room = rooms.get(roomCode);
     if (!room || !room.gameState.started || room.gameState.gameMode !== 'lefast') {
@@ -108,7 +170,8 @@ function handleLeFastQuestionEnd(roomCode) {
                 playerId: playerId,
                 playerName: room.players.get(playerId)?.name || 'Inconnu',
                 timestamp: correctAttempt.timestamp,
-                responseTime: correctAttempt.responseTime
+                responseTime: correctAttempt.responseTime,
+                attemptNumber: playerAnswers.indexOf(correctAttempt) + 1
             });
         }
     }
@@ -116,23 +179,40 @@ function handleLeFastQuestionEnd(roomCode) {
     // Trier par timestamp (premier = plus petit timestamp)
     correctAnswers.sort((a, b) => a.timestamp - b.timestamp);
     
-    // Attribution des points selon le classement
-    const pointsScale = [1000, 700, 500, 300, 200]; // puis 100 pour tous les autres
+    // Attribution des points selon le classement avec bonus de rapidité
+    const pointsScale = [1200, 800, 600, 400, 300, 250, 200]; // Plus de points pour encourager
     const questionResults = [];
     
     correctAnswers.forEach((answer, index) => {
-        const points = index < pointsScale.length ? pointsScale[index] : 100;
+        let basePoints = index < pointsScale.length ? pointsScale[index] : 150;
+        
+        // Bonus selon le nombre de tentatives utilisées
+        let attemptBonus = 0;
+        if (answer.attemptNumber === 1) attemptBonus = 200; // Bonus première tentative
+        else if (answer.attemptNumber === 2) attemptBonus = 100; // Bonus deuxième tentative
+        
+        // Bonus de rapidité (réponse en moins de 5 secondes)
+        let speedBonus = 0;
+        if (answer.responseTime < 5000) {
+            speedBonus = Math.max(50, Math.floor((5000 - answer.responseTime) / 100));
+        }
+        
+        const totalPoints = basePoints + attemptBonus + speedBonus;
         const player = room.players.get(answer.playerId);
         
         if (player) {
-            player.score += points;
+            player.score += totalPoints;
             questionResults.push({
                 playerId: answer.playerId,
                 playerName: answer.playerName,
                 rank: index + 1,
-                points: points,
+                basePoints: basePoints,
+                attemptBonus: attemptBonus,
+                speedBonus: speedBonus,
+                totalPoints: totalPoints,
                 newScore: player.score,
-                responseTime: answer.responseTime
+                responseTime: answer.responseTime,
+                attemptNumber: answer.attemptNumber
             });
             
             // Vérifier si le joueur a atteint 15000 points
@@ -144,22 +224,45 @@ function handleLeFastQuestionEnd(roomCode) {
         }
     });
     
-    // Envoyer le récapitulatif à tous les joueurs
+    // Créer un récapitulatif détaillé pour tous les joueurs
+    const allPlayersStats = [];
+    for (const [playerId, player] of room.players.entries()) {
+        const playerAnswers = questionAnswers.get(playerId) || [];
+        const hasCorrectAnswer = correctAnswers.some(ca => ca.playerId === playerId);
+        
+        allPlayersStats.push({
+            playerId: playerId,
+            playerName: player.name,
+            currentScore: player.score,
+            attempts: playerAnswers.length,
+            hasCorrectAnswer: hasCorrectAnswer,
+            answers: playerAnswers.map(attempt => ({
+                answer: attempt.answer,
+                isCorrect: attempt.isCorrect,
+                responseTime: attempt.responseTime
+            }))
+        });
+    }
+    
+    // Envoyer le récapitulatif détaillé à tous les joueurs
     io.to(roomCode).emit('lefast-question-results', {
         correctAnswer: correctAnswer,
+        flagCode: room.gameState.currentFlag.code,
         results: questionResults,
-        totalAnswers: questionAnswers.size
+        allPlayersStats: allPlayersStats,
+        totalPlayers: room.players.size,
+        correctCount: correctAnswers.length
     });
     
-    console.log(`[LeFast] Question terminée dans room ${roomCode}: ${correctAnswers.length} bonnes réponses`);
+    console.log(`[LeFast] Question terminée dans room ${roomCode}: ${correctAnswers.length}/${room.players.size} bonnes réponses`);
     
     // Nettoyer les données de la question
     room.gameState.lefastAnswers = new Map();
     
-    // Programmer la prochaine question après 4 secondes
+    // Programmer la prochaine question après 6 secondes (plus long)
     setTimeout(() => {
         generateNextLeFastQuestion(roomCode);
-    }, 4000);
+    }, 6000);
 }
 
 // Générer la prochaine question LeFast
@@ -230,7 +333,7 @@ class TimerManager {
         this.timers = new Map(); // roomCode -> { questionTimer, cleanupTimer }
     }
     
-    startQuestionTimer(roomCode, callback, duration = 10000) {
+    startQuestionTimer(roomCode, callback, duration = 12000) { // 12s par défaut au lieu de 10s
         this.clearQuestionTimer(roomCode);
         
         const timerId = setTimeout(() => {
@@ -283,6 +386,7 @@ const timerManager = new TimerManager();
 class AntiSpamManager {
     constructor() {
         this.questionTimestamps = new Map(); // roomCode -> timestamp
+        this.playerAttempts = new Map(); // Pour le nettoyage
     }
     
     // Marquer le début d'une nouvelle question
@@ -317,9 +421,9 @@ class AntiSpamManager {
 // Instance globale du gestionnaire anti-spam
 const antiSpamManager = new AntiSpamManager();
 
-// === LOGIQUE CENTRALISÉE LEDREAM ===
+// === LOGIQUE CENTRALISÉE LEDREAM AMÉLIORÉE ===
 
-// Fonction centralisée pour gérer la fin d'une question LeDream
+// Fonction centralisée pour gérer la fin d'une question LeDream avec meilleurs dashboards
 async function handleLeDreamQuestionEnd(roomCode) {
     const room = rooms.get(roomCode);
     if (!room || !room.gameState.started) {
@@ -329,39 +433,88 @@ async function handleLeDreamQuestionEnd(roomCode) {
     
     const correctAnswer = room.gameState.currentFlag.name;
     
-    // Préparer les résultats des joueurs
+    // Préparer les résultats détaillés des joueurs
     const playerResults = [];
+    const detailedStats = {
+        totalPlayers: room.players.size,
+        correctCount: 0,
+        averageResponseTime: 0,
+        fastestResponse: null,
+        slowestResponse: null
+    };
+    
+    let responseTimes = [];
+    
     if (room.gameState.ledreamAnswers) {
         for (const [playerId, result] of room.gameState.ledreamAnswers.entries()) {
             const playerData = room.players.get(playerId);
             if (playerData) {
-                playerResults.push({
+                const playerResult = {
                     playerId: playerId,
                     playerName: playerData.name,
                     isCorrect: result.isCorrect,
                     points: result.points,
+                    responseTime: result.responseTime,
+                    responseType: result.responseType || 'text',
                     newScore: playerData.score
-                });
+                };
+                
+                playerResults.push(playerResult);
+                
+                if (result.isCorrect) {
+                    detailedStats.correctCount++;
+                    responseTimes.push(result.responseTime);
+                    
+                    if (!detailedStats.fastestResponse || result.responseTime < detailedStats.fastestResponse.time) {
+                        detailedStats.fastestResponse = {
+                            playerName: playerData.name,
+                            time: result.responseTime
+                        };
+                    }
+                    
+                    if (!detailedStats.slowestResponse || result.responseTime > detailedStats.slowestResponse.time) {
+                        detailedStats.slowestResponse = {
+                            playerName: playerData.name,
+                            time: result.responseTime
+                        };
+                    }
+                }
             }
         }
     }
     
-    // Envoyer les résultats finaux à tous les joueurs
+    // Calculer le temps de réponse moyen
+    if (responseTimes.length > 0) {
+        detailedStats.averageResponseTime = Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length);
+    }
+    
+    // Trier les joueurs par score pour le classement
+    const sortedPlayers = Array.from(room.players.values())
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5); // Top 5 seulement
+    
+    // Envoyer les résultats détaillés à tous les joueurs
     io.to(roomCode).emit('ledream-question-ended', {
         correctAnswer: correctAnswer,
-        playerResults: playerResults
+        flagCode: room.gameState.currentFlag.code,
+        playerResults: playerResults,
+        detailedStats: detailedStats,
+        topPlayers: sortedPlayers.map(p => ({
+            name: p.name,
+            score: p.score
+        }))
     });
     
-    console.log(`[LeDream] Résultats envoyés pour room ${roomCode}: ${playerResults.length} joueurs`);
+    console.log(`[LeDream] Résultats détaillés envoyés pour room ${roomCode}: ${detailedStats.correctCount}/${detailedStats.totalPlayers} bonnes réponses`);
     
     // Nettoyer les données de la question
     room.gameState.ledreamAnswers = new Map();
     antiSpamManager.cleanupQuestion(roomCode);
     
-    // Programmer la prochaine question après un délai
+    // Programmer la prochaine question après un délai plus long
     setTimeout(() => {
         generateNextLeDreamQuestion(roomCode);
-    }, 2000); // 2 secondes pour voir les résultats
+    }, 4000); // 4 secondes pour mieux voir les résultats
 }
 
 // Fonction pour générer la prochaine question LeDream
@@ -384,7 +537,7 @@ function generateNextLeDreamQuestion(roomCode) {
     console.log(`[LeDream] Nouvelle question générée pour room ${roomCode}: ${newFlag.code} - ${newFlag.name}`);
 }
 
-// Fonction pour démarrer une question LeDream avec timer sécurisé
+// Fonction pour démarrer une question LeDream avec timer sécurisé plus long
 function startLeDreamQuestion(roomCode) {
     const room = rooms.get(roomCode);
     if (!room || !room.gameState.started) {
@@ -400,12 +553,12 @@ function startLeDreamQuestion(roomCode) {
     // Marquer le début de la question
     antiSpamManager.markQuestionStart(roomCode);
     
-    // Démarrer le timer de 10 secondes
+    // Démarrer le timer de 12 secondes (au lieu de 10)
     timerManager.startQuestionTimer(roomCode, () => {
         handleLeDreamQuestionEnd(roomCode);
-    }, 10000);
+    }, 12000);
     
-    console.log(`[LeDream] Question démarrée pour room ${roomCode}`);
+    console.log(`[LeDream] Question démarrée pour room ${roomCode} (12s)`);
 }
 
 // === GESTION DES ROOMS ===
@@ -583,6 +736,7 @@ function endGame(roomCode, gameMode = null) {
     
     const mode = gameMode || room.gameState.gameMode;
     
+    // Création du classement final détaillé
     const finalRanking = Array.from(room.players.values())
         .map(player => ({
             name: player.name,
@@ -590,8 +744,25 @@ function endGame(roomCode, gameMode = null) {
             isHost: player.isHost
         }))
         .sort((a, b) => b.score - a.score);
+
+    // Statistiques de fin de partie
+    const gameStats = {
+        totalPlayers: room.players.size,
+        gameMode: mode,
+        gameDuration: room.gameState.gameDuration,
+        winner: finalRanking[0],
+        averageScore: Math.round(finalRanking.reduce((sum, p) => sum + p.score, 0) / finalRanking.length),
+        scoreRange: {
+            highest: finalRanking[0]?.score || 0,
+            lowest: finalRanking[finalRanking.length - 1]?.score || 0
+        }
+    };
     
-    io.to(roomCode).emit('game-ended', { finalRanking });
+    io.to(roomCode).emit('game-ended', { 
+        finalRanking,
+        gameStats,
+        gameMode: mode
+    });
     
     // Réinitialiser l'état du jeu
     room.gameState.started = false;
@@ -622,7 +793,7 @@ function endGame(roomCode, gameMode = null) {
         console.log(`[LeFast] Jeu LeFast terminé dans room ${roomCode}`);
     }
     
-    console.log(`Jeu terminé dans la room: ${roomCode}`);
+    console.log(`Jeu terminé dans la room: ${roomCode} - Gagnant: ${gameStats.winner?.name || 'Aucun'}`);
 }
 
 // Gestion des connexions Socket.io
@@ -802,7 +973,7 @@ io.on('connection', (socket) => {
         
         // Logique selon le mode de jeu
         if (mode === 'lefast') {
-            // === MODE LEFAST NOUVELLES RÈGLES (VERSION SIMPLIFIÉE) ===
+            // === MODE LEFAST NOUVELLES RÈGLES (VERSION AMÉLIORÉE) ===
             
             // Validation basique du payload
             if (!answer || typeof answer !== 'string' || answer.trim().length === 0) {
@@ -871,7 +1042,7 @@ io.on('connection', (socket) => {
             });
             
         } else if (mode === 'ledream') {
-            // === MODE LEDREAM SÉCURISÉ ===
+            // === MODE LEDREAM SÉCURISÉ AMÉLIORÉ ===
             
             // 1. Validation stricte du payload
             const validation = validateSubmitAnswerPayload(data);
@@ -955,6 +1126,7 @@ io.on('connection', (socket) => {
                 answer: sanitizedAnswer,
                 isCorrect: isCorrect,
                 responseTime: sanitizedResponseTime,
+                responseType: responseType,
                 points: points,
                 timestamp: Date.now()
             });
@@ -1058,7 +1230,7 @@ io.on('connection', (socket) => {
                 }
             });
             
-            // Si le joueur n'a pas terminé, générer un nouveau drapeau après un délai
+            // Si le joueur n'a pas terminé, générer un nouveau drapeau après un délai plus long
             if (!playerStats.isFinished) {
                 setTimeout(() => {
                     const currentRoom = rooms.get(player.roomCode);
@@ -1073,7 +1245,7 @@ io.on('connection', (socket) => {
                     // Envoyer le nouveau drapeau seulement à ce joueur
                     socket.emit('new-flag', { flag: newFlag });
                     
-                }, 1200); // 1.2 secondes pour voir le feedback et éviter le spam
+                }, 1800); // 1.8 secondes pour mieux voir le feedback
             }
         }
     });
@@ -1138,6 +1310,7 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`🚀 Serveur Flag Party démarré sur le port ${PORT}`);
     console.log(`🌐 Accédez au jeu sur: http://localhost:${PORT}`);
+    console.log(`🏳️ Base de données: ${countryCodes.length} pays disponibles`);
 });
 
 // === NETTOYAGE AUTOMATIQUE AMÉLIORÉ ===
@@ -1154,6 +1327,7 @@ setInterval(() => {
     console.log(`[Cleanup] - Rooms actives: ${rooms.size}`);
     console.log(`[Cleanup] - Joueurs connectés: ${players.size}`);
     console.log(`[Cleanup] - Timers actifs: ${timerManager.timers.size}`);
+    console.log(`[Cleanup] - Pays dans la base: ${countryCodes.length}`);
     
     // Nettoyer les données anti-spam anciennes
     const now = Date.now();
