@@ -524,16 +524,21 @@ function generateNextLeDreamQuestion(roomCode) {
         console.log(`[LeDream] Room ${roomCode} non trouvée ou jeu arrêté pour nouvelle question`);
         return;
     }
-    
+
     const newFlag = generateRandomFlag();
     room.gameState.currentFlag = newFlag;
-    
+
     // Marquer le début de la nouvelle question pour l'anti-spam
     antiSpamManager.markQuestionStart(roomCode);
-    
+
     // Envoyer la nouvelle question
     io.to(roomCode).emit('new-flag', { flag: newFlag });
-    
+
+    // Démarrer le timer automatique de 10 secondes pour la prochaine question
+    timerManager.startQuestionTimer(roomCode, () => {
+        handleLeDreamQuestionEnd(roomCode);
+    }, 10000); // 10 secondes
+
     console.log(`[LeDream] Nouvelle question générée pour room ${roomCode}: ${newFlag.code} - ${newFlag.name}`);
 }
 
@@ -768,7 +773,12 @@ function endGame(roomCode, gameMode = null) {
     room.gameState.started = false;
     room.gameState.currentFlag = null;
     room.gameState.timeLeft = room.gameState.gameDuration;
-    
+
+    // Réinitialiser les scores des joueurs pour permettre une nouvelle partie
+    room.players.forEach(player => {
+        player.score = 0;
+    });
+
     // Nettoyer le timer s'il existe
     if (room.gameState.timer) {
         clearInterval(room.gameState.timer);
@@ -894,6 +904,23 @@ io.on('connection', (socket) => {
         console.log(`[Game] Durée changée à ${data.duration}s pour room ${player.roomCode} (mode LeFist)`);
     });
     
+    // Demander la liste des joueurs (pour retour au lobby)
+    socket.on('request-players-list', () => {
+        const player = players.get(socket.id);
+        if (!player) return;
+
+        const room = rooms.get(player.roomCode);
+        if (!room) return;
+
+        // Envoyer la liste des joueurs mise à jour à tous les joueurs de la room
+        const playersList = getRoomPlayersList(room);
+        io.to(player.roomCode).emit('players-list-updated', {
+            players: playersList
+        });
+
+        console.log(`[Room] Liste des joueurs mise à jour pour room ${player.roomCode}`);
+    });
+
     // Commencer le jeu (seulement l'hôte)
     socket.on('start-game', () => {
         const player = players.get(socket.id);
@@ -933,11 +960,17 @@ io.on('connection', (socket) => {
         } else if (room.gameState.gameMode === 'ledream') {
             // Pour LeDream : pas de timer global, jeu en continu
             antiSpamManager.markQuestionStart(player.roomCode);
-            console.log(`[LeDream] Jeu LeDream démarré pour room ${player.roomCode} - pas de timer global`);
+
+            // Démarrer le timer automatique de 10 secondes pour la première question
+            timerManager.startQuestionTimer(player.roomCode, () => {
+                handleLeDreamQuestionEnd(player.roomCode);
+            }, 10000); // 10 secondes
+
+            console.log(`[LeDream] Jeu LeDream démarré pour room ${player.roomCode} - timer automatique de 10s`);
         } else {
             // Pour LeFist : utiliser le timer global avec les nouvelles règles
             startGameTimer(player.roomCode);
-            
+
             // Initialiser les stats LeFist pour chaque joueur
             room.gameState.lefistStats = new Map();
             room.players.forEach((player, playerId) => {
@@ -947,8 +980,9 @@ io.on('connection', (socket) => {
                     isFinished: false
                 });
             });
-            
+
             console.log(`[LeFist] Jeu LeFist démarré pour room ${player.roomCode} (${room.gameState.gameDuration}s)`);
+            console.log(`[LeFist] Premier drapeau: ${room.gameState.currentFlag.code} - ${room.gameState.currentFlag.name}`);
         }
         
         console.log(`Jeu commencé dans la room: ${player.roomCode}`);
@@ -1130,12 +1164,9 @@ io.on('connection', (socket) => {
                 points: points,
                 timestamp: Date.now()
             });
-            
+
             console.log(`[LeDream] Réponse enregistrée: ${roomPlayer.name} -> "${sanitizedAnswer}" (${isCorrect ? 'CORRECT' : 'INCORRECT'})`);
-            
-            // 8. Démarrer le timer de question si ce n'est pas déjà fait
-            startLeDreamQuestion(player.roomCode);
-            
+
             // Informer le joueur du résultat
             socket.emit('answer-result', {
                 isCorrect,

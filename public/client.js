@@ -169,6 +169,11 @@ function goHome() {
   hasCorrectAnswer = false;
   lefastAttemptsHistory = []; // Réinitialiser l'historique
   lefastTimeLeft = 15;
+
+  // Réinitialiser l'état LeFist
+  lefistPlayerStats = { correct: 0, incorrect: 0, isFinished: false };
+  lefistCanClick = true;
+
   gameState = {
     score: 0, currentFlag: null, gameStarted: false,
     timeLeft: 30, gameDuration: 30, betweenQuestions: false, speed: 1
@@ -1119,6 +1124,11 @@ socket.on('host-changed', (data) => {
   }
 });
 
+socket.on('players-list-updated', (data) => {
+  updatePlayersList(data.players);
+  console.log('[Lobby] Liste des joueurs mise à jour');
+});
+
 socket.on('game-mode-changed', (mode) => {
   currentGameMode = mode;
   document.querySelectorAll('.game-mode-card').forEach(card => card.classList.remove('selected'));
@@ -1152,7 +1162,16 @@ socket.on('game-started', (data) => {
     showScreen('lefistScreen');
     document.getElementById('lefistTimer').textContent = data.timeLeft;
     lefistPlayerStats = { correct: 0, incorrect: 0, isFinished: false };
+    lefistCanClick = true; // Réinitialiser pour permettre les clics
+
+    // S'assurer que la zone de jeu est visible
+    const gameArea = document.getElementById('lefistGameArea');
+    const finishedScreen = document.getElementById('lefistFinishedScreen');
+    if (gameArea) gameArea.style.display = 'block';
+    if (finishedScreen) finishedScreen.style.display = 'none';
+
     updateLefistStats(lefistPlayerStats);
+    console.log('[LeFist] Jeu démarré - clics activés, zone de jeu visible');
   } else if (currentGameMode === 'lerythm') {
     showScreen('lerythmScreen');
     startLerythmGame();
@@ -1281,28 +1300,21 @@ socket.on('new-flag', (data) => {
 });
 
 socket.on('game-ended', (data) => {
-  const rankingElement = document.getElementById('finalRanking');
-  rankingElement.innerHTML = data.finalRanking.map((p, i) => `
-    <div class="player">
-      <span>${i + 1}. ${p.name} ${p.name === currentPlayer ? '(Vous)' : ''}</span>
-      <span>${p.score} pts</span>
-    </div>
-  `).join('');
-  showScreen('resultsScreen');
+  // Utiliser le nouveau dashboard au lieu de l'ancien écran de résultats
+  showGameDashboard(data.finalRanking, data.gameMode);
   showNotification('Fin de partie !');
 });
 
 // Dashboard universel pour tous les modes
 function showGameDashboard(finalRanking, gameMode) {
-  const dashboardElement = document.getElementById('gameDashboard');
   const rankingElement = document.getElementById('dashboardRanking');
-  
-  if (dashboardElement && rankingElement) {
+
+  if (rankingElement) {
     rankingElement.innerHTML = finalRanking.map((p, i) => {
       const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
       const isCurrentPlayer = p.name === currentPlayer;
       const playerClass = isCurrentPlayer ? 'current-player' : '';
-      
+
       return `
         <div class="dashboard-player ${playerClass}">
           <span class="player-rank">${medal}</span>
@@ -1311,25 +1323,62 @@ function showGameDashboard(finalRanking, gameMode) {
         </div>
       `;
     }).join('');
-    
+
     // Afficher le bon titre selon le mode
     const titleElement = document.getElementById('dashboardTitle');
     if (titleElement) {
       const modeNames = {
         'lefast': 'LeFast',
-        'ledream': 'LeDream', 
-        'lefist': 'LeFist'
+        'ledream': 'LeDream',
+        'lefist': 'LeFist',
+        'lerythm': 'LeRythm'
       };
       titleElement.textContent = `🏆 Classement ${modeNames[gameMode] || ''}`;
     }
-    
+
     showScreen('dashboardScreen');
   }
 }
 
 function returnToLobby() {
+  // Réinitialiser l'état du jeu côté client
+  gameState.gameStarted = false;
+  gameState.score = 0;
+  gameState.currentFlag = null;
+  gameState.betweenQuestions = false;
+
+  // Réinitialiser les états spécifiques à chaque mode
+  lefastAttempts = 0;
+  hasCorrectAnswer = false;
+  lefastAttemptsHistory = [];
+  lefastTimeLeft = 15;
+  lefistPlayerStats = { correct: 0, incorrect: 0, isFinished: false };
+  lefistCanClick = true;
+  selectedLedreamMode = null;
+
+  // Nettoyer les timers
+  if (betweenQuestionsTimer) {
+    clearInterval(betweenQuestionsTimer);
+    betweenQuestionsTimer = null;
+  }
+  if (lefastQuestionTimer) {
+    clearInterval(lefastQuestionTimer);
+    lefastQuestionTimer = null;
+  }
+  if (ledreamQuestionTimer) {
+    clearInterval(ledreamQuestionTimer);
+    ledreamQuestionTimer = null;
+  }
+
+  // Réinitialiser l'affichage des scores
+  updateScore(0, currentGameMode);
+
+  // Demander la liste mise à jour des joueurs au serveur
+  socket.emit('request-players-list');
+
   // Retourner à la salle d'attente
   showScreen('waitingScreen');
+  showNotification('Prêt pour une nouvelle partie !');
 }
 
 function quitGame() {
