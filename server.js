@@ -258,11 +258,11 @@ function handleLeFastQuestionEnd(roomCode) {
     
     // Nettoyer les données de la question
     room.gameState.lefastAnswers = new Map();
-    
-    // Programmer la prochaine question après 6 secondes (plus long)
+
+    // Programmer la prochaine question après 4 secondes (délai optimisé)
     setTimeout(() => {
         generateNextLeFastQuestion(roomCode);
-    }, 6000);
+    }, 4000);
 }
 
 // Générer la prochaine question LeFast
@@ -696,12 +696,12 @@ function startGameTimer(roomCode) {
         console.log(`[Timer] Pas de timer global pour room ${roomCode} (mode ${room.gameState.gameMode})`);
         return;
     }
-    
-    // Pour LeFist : timer global
+
+    // Pour LeFist et LeRythm : timer global
     room.gameState.timer = setInterval(() => {
         room.gameState.timeLeft--;
-        
-        // Envoyer le timer à tous les joueurs (seulement LeFist maintenant)
+
+        // Envoyer le timer à tous les joueurs (LeFist et LeRythm)
         io.to(roomCode).emit('timer-update', room.gameState.timeLeft);
         
         if (room.gameState.timeLeft <= 0) {
@@ -801,6 +801,24 @@ function endGame(roomCode, gameMode = null) {
         }
         antiSpamManager.cleanupQuestion(roomCode);
         console.log(`[LeFast] Jeu LeFast terminé dans room ${roomCode}`);
+    } else if (mode === 'lefist') {
+        // Nettoyer les données LeFist
+        if (room.gameState.lefistStats) {
+            room.gameState.lefistStats.clear();
+        }
+        if (room.gameState.lefistPlayerFlags) {
+            room.gameState.lefistPlayerFlags.clear();
+        }
+        if (room.gameState.lefistLastResponse) {
+            room.gameState.lefistLastResponse.clear();
+        }
+        console.log(`[LeFist] Jeu LeFist terminé dans room ${roomCode}`);
+    } else if (mode === 'lerythm') {
+        // Nettoyer les données LeRythm
+        if (room.gameState.lerythmScores) {
+            room.gameState.lerythmScores.clear();
+        }
+        console.log(`[LeRythm] Jeu LeRythm terminé dans room ${roomCode}`);
     }
     
     console.log(`Jeu terminé dans la room: ${roomCode} - Gagnant: ${gameStats.winner?.name || 'Aucun'}`);
@@ -967,24 +985,36 @@ io.on('connection', (socket) => {
             }, 10000); // 10 secondes
 
             console.log(`[LeDream] Jeu LeDream démarré pour room ${player.roomCode} - timer automatique de 10s`);
-        } else {
+        } else if (room.gameState.gameMode === 'lefist') {
             // Pour LeFist : utiliser le timer global avec les nouvelles règles
             startGameTimer(player.roomCode);
 
             // Initialiser les stats LeFist pour chaque joueur
             room.gameState.lefistStats = new Map();
+            room.gameState.lefistPlayerFlags = new Map(); // Stocker le drapeau actuel de chaque joueur
+
             room.players.forEach((player, playerId) => {
                 room.gameState.lefistStats.set(playerId, {
                     correct: 0,
                     incorrect: 0,
                     isFinished: false
                 });
+                // Assigner le drapeau initial à chaque joueur
+                room.gameState.lefistPlayerFlags.set(playerId, room.gameState.currentFlag);
             });
 
             console.log(`[LeFist] Jeu LeFist démarré pour room ${player.roomCode} (${room.gameState.gameDuration}s)`);
             console.log(`[LeFist] Premier drapeau: ${room.gameState.currentFlag.code} - ${room.gameState.currentFlag.name}`);
+        } else if (room.gameState.gameMode === 'lerythm') {
+            // Pour LeRythm : mode rhythm game client-side avec timer global
+            startGameTimer(player.roomCode);
+
+            // Initialiser le suivi des scores LeRythm
+            room.gameState.lerythmScores = new Map();
+
+            console.log(`[LeRythm] Jeu LeRythm démarré pour room ${player.roomCode} (${room.gameState.gameDuration}s)`);
         }
-        
+
         console.log(`Jeu commencé dans la room: ${player.roomCode}`);
     });
     
@@ -1175,29 +1205,49 @@ io.on('connection', (socket) => {
                 newScore: roomPlayer.score,
                 correctAnswer: correctAnswer
             });
+
+            // Vérifier si tous les joueurs ont répondu
+            if (room.gameState.ledreamAnswers.size === room.players.size) {
+                console.log(`[LeDream] Tous les joueurs ont répondu - fin anticipée de la question`);
+                // Annuler le timer actuel et déclencher la fin de la question
+                timerManager.clearQuestionTimer(player.roomCode);
+                // Déclencher la fin de la question après un petit délai (1s) pour que le dernier joueur voie son feedback
+                setTimeout(() => {
+                    handleLeDreamQuestionEnd(player.roomCode);
+                }, 1000);
+            }
             
         } else if (mode === 'lefist') {
             // === MODE LEFIST NOUVEAU CONCEPT AVEC PROTECTION ANTI-SPAM ===
-            console.log(`[LeFist] Réponse reçue: ${answer} pour le drapeau ${room.gameState.currentFlag.code}`);
-            
+
+            // Récupérer le drapeau individuel du joueur
+            const playerFlag = room.gameState.lefistPlayerFlags?.get(socket.id);
+
+            if (!playerFlag) {
+                console.log(`[LeFist] Pas de drapeau trouvé pour le joueur ${socket.id}`);
+                return;
+            }
+
+            console.log(`[LeFist] Réponse reçue: ${answer} pour le drapeau ${playerFlag.code} (${playerFlag.name})`);
+
             // Vérification anti-spam spécifique à LeFist
             const now = Date.now();
             const playerId = socket.id;
-            
+
             // Vérifier si le joueur a déjà une réponse en cours de traitement
             if (!room.gameState.lefistLastResponse) {
                 room.gameState.lefistLastResponse = new Map();
             }
-            
+
             const lastResponse = room.gameState.lefistLastResponse.get(playerId);
             if (lastResponse && (now - lastResponse) < 1000) { // 1 seconde minimum entre les réponses
                 console.log(`[LeFist] Spam détecté pour ${socket.id} - réponse ignorée`);
                 return;
             }
-            
+
             room.gameState.lefistLastResponse.set(playerId, now);
-            
-            const correctContinent = getCountryContinent(room.gameState.currentFlag.code);
+
+            const correctContinent = getCountryContinent(playerFlag.code);
             console.log(`[LeFist] Continent correct: ${correctContinent}`);
             
             isCorrect = answer === correctContinent;
@@ -1252,7 +1302,7 @@ io.on('connection', (socket) => {
                 isCorrect,
                 points,
                 newScore: roomPlayer.score,
-                correctAnswer: room.gameState.currentFlag.name,
+                correctAnswer: playerFlag.name,
                 correctContinent: correctContinent,
                 playerStats: {
                     correct: playerStats.correct,
@@ -1260,7 +1310,7 @@ io.on('connection', (socket) => {
                     isFinished: playerStats.isFinished
                 }
             });
-            
+
             // Si le joueur n'a pas terminé, générer un nouveau drapeau après un délai plus long
             if (!playerStats.isFinished) {
                 setTimeout(() => {
@@ -1269,18 +1319,61 @@ io.on('connection', (socket) => {
                         console.log(`[LeFist] Room non trouvée ou jeu arrêté`);
                         return;
                     }
-                    
+
                     const newFlag = generateRandomFlag();
+
+                    // Stocker le nouveau drapeau pour ce joueur spécifiquement
+                    if (currentRoom.gameState.lefistPlayerFlags) {
+                        currentRoom.gameState.lefistPlayerFlags.set(socket.id, newFlag);
+                    }
+
                     console.log(`[LeFist] Nouveau drapeau pour ${roomPlayer.name}: ${newFlag.code} - ${newFlag.name}`);
-                    
+
                     // Envoyer le nouveau drapeau seulement à ce joueur
                     socket.emit('new-flag', { flag: newFlag });
-                    
+
                 }, 1800); // 1.8 secondes pour mieux voir le feedback
             }
         }
     });
     
+    // Recevoir le score final LeRythm d'un joueur
+    socket.on('lerythm-game-finished', (data) => {
+        const player = players.get(socket.id);
+        if (!player) return;
+
+        const room = rooms.get(player.roomCode);
+        if (!room || !room.gameState.started || room.gameState.gameMode !== 'lerythm') return;
+
+        const roomPlayer = room.players.get(socket.id);
+        if (!roomPlayer) return;
+
+        // Enregistrer le score du joueur
+        roomPlayer.score = data.score || 0;
+
+        // Marquer que ce joueur a terminé
+        if (!room.gameState.lerythmScores) {
+            room.gameState.lerythmScores = new Map();
+        }
+
+        room.gameState.lerythmScores.set(socket.id, {
+            score: data.score || 0,
+            stats: data.stats || {},
+            accuracy: data.accuracy || 0
+        });
+
+        console.log(`[LeRythm] ${roomPlayer.name} a terminé avec ${data.score} points (${data.accuracy}% précision)`);
+
+        // Vérifier si tous les joueurs ont terminé
+        if (room.gameState.lerythmScores.size === room.players.size) {
+            console.log(`[LeRythm] Tous les joueurs ont terminé - fin de partie`);
+            // Tous les joueurs ont terminé, déclencher la fin du jeu
+            clearInterval(room.gameState.timer);
+            room.gameState.timer = null;
+            endGame(player.roomCode, 'lerythm');
+        }
+    });
+
     // Quitter la room
     socket.on('leave-room', () => {
         handlePlayerLeave(socket.id);

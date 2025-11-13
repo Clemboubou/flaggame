@@ -174,6 +174,23 @@ function goHome() {
   lefistPlayerStats = { correct: 0, incorrect: 0, isFinished: false };
   lefistCanClick = true;
 
+  // Réinitialiser l'état LeRythm
+  lerythmGameState = {
+    isPlaying: false,
+    gameOver: false,
+    score: 0,
+    combo: 0,
+    multiplier: 1,
+    stats: { perfect: 0, good: 0, ok: 0, miss: 0 },
+    fallingFlags: [],
+    spawnTimer: null,
+    gameTimer: null,
+    startTime: null,
+    activeLanes: []
+  };
+  if (lerythmGameState.spawnTimer) clearInterval(lerythmGameState.spawnTimer);
+  if (lerythmGameState.gameTimer) clearTimeout(lerythmGameState.gameTimer);
+
   gameState = {
     score: 0, currentFlag: null, gameStarted: false,
     timeLeft: 30, gameDuration: 30, betweenQuestions: false, speed: 1
@@ -428,7 +445,7 @@ function showLefastBetweenQuestions(results, correctAnswer) {
   
   document.getElementById('lefastResultsDisplay').innerHTML = resultHTML;
 
-  let countdown = 4;
+  let countdown = 3;
   document.getElementById('lefastQuestionCountdown').textContent = countdown;
 
   if (betweenQuestionsTimer) clearInterval(betweenQuestionsTimer);
@@ -1356,6 +1373,21 @@ function returnToLobby() {
   lefistCanClick = true;
   selectedLedreamMode = null;
 
+  // Réinitialiser l'état LeRythm
+  lerythmGameState = {
+    isPlaying: false,
+    gameOver: false,
+    score: 0,
+    combo: 0,
+    multiplier: 1,
+    stats: { perfect: 0, good: 0, ok: 0, miss: 0 },
+    fallingFlags: [],
+    spawnTimer: null,
+    gameTimer: null,
+    startTime: null,
+    activeLanes: []
+  };
+
   // Nettoyer les timers
   if (betweenQuestionsTimer) {
     clearInterval(betweenQuestionsTimer);
@@ -1368,6 +1400,12 @@ function returnToLobby() {
   if (ledreamQuestionTimer) {
     clearInterval(ledreamQuestionTimer);
     ledreamQuestionTimer = null;
+  }
+  if (lerythmGameState.spawnTimer) {
+    clearInterval(lerythmGameState.spawnTimer);
+  }
+  if (lerythmGameState.gameTimer) {
+    clearTimeout(lerythmGameState.gameTimer);
   }
 
   // Réinitialiser l'affichage des scores
